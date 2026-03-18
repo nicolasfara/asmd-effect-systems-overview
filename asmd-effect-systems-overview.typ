@@ -143,7 +143,7 @@
 == Effect Systems
 
 #feature-block("Effect System")[
-  An effect system is a #bold[type system] that tracks the *side effects* of computations, allowing developers to #underline[reason about] and #underline[control] them more effectively.
+  An effect system is kind of a #bold[type system] that tracks the *side effects* of computations, allowing developers to #underline[reason about] and #underline[control] them more effectively.
 ]
 
 === Effect Systems in the Wild
@@ -151,3 +151,33 @@
 - #only("2-")[Java's Checked Exceptions]
 - #only("3-")[Monads in Haskell]
 - #only("4-")[Koka's Algebraic Effects]
+
+== Example
+
+Throwing exceptions or errors is a *control-flow* side effect.
+
+```scala
+def divide(a: Int, b: Int): Int =
+  if (b == 0) throw new Exception("Divide by zero")
+  else a / b
+```
+
+- The function may fail #bold[unexpectedly] (e.g., if `b` is zero).
+- Error isn't part of the #bold[function's return type], so callers may forget to handle it.
+- The effects are #bold["hidden"] in the implementation, making reasoning and testing harder.
+
+#pagebreak()
+
+Non-determinism (random numbers, current time) is a *side effect*.
+
+Randomness breaks *purity* as different outputs will be produced each time.
+
+```scala
+import scala.util.Random
+
+def getRandom(): Int = Random.nextInt(100)
+```
+
+- We have no control over the output, making testing and reasoning difficult.
+- The effect is hidden in the implementation, not reflected in the function's type.
+- Callers may be surprised by the non-deterministic behavior.
