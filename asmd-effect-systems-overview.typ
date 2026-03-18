@@ -47,8 +47,7 @@
       set text(font: "Fira Sans", weight: "light", size: 18pt)
       show math.equation: set text(font: "Fira Math")
 
-      show raw.where(block: true): set text(size: 1em, font: "JetBrains Mono")
-      show raw.where(block: false): set text(size: 18pt, font: "JetBrains Mono")
+      show raw: set text(size: 1em, font: "JetBrains Mono")
 
       show bibliography: set text(size: 0.75em)
       show footnote.entry: set text(size: 0.75em)
@@ -181,3 +180,116 @@ def getRandom(): Int = Random.nextInt(100)
 - We have no control over the output, making testing and reasoning difficult.
 - The effect is hidden in the implementation, not reflected in the function's type.
 - Callers may be surprised by the non-deterministic behavior.
+
+== ???
+
+Put a slide here motivating the need for a more general and powerful way to control effects, leading to the introduction of monads as a way to structure computations with effects in a pure functional programming language like Haskell.
+
+= Monadic Effects
+
+#slide[
+  #feature-block("Effect concept")[
+    Represents the #bold["additional context"] that computations may have beyond just producing a value, such as state changes, I/O, exceptions, etc.
+  ]
+
+  *Monads* capture effects by structuring computations in a way that allows us to sequence operations while keeping track of the effects they produce.
+
+  #only("2")[
+    ```haskell
+    -- Monad definition in Haskell
+    class Monad m where
+      return :: a -> m a
+      (>>=) :: m a -> (a -> m b) -> m b
+    ```
+  ]
+
+  #only("3")[
+    ```scala
+    // Monad definition in Scala
+    trait Monad[M[_]]:
+      def pure[A](value: A): M[A]
+      def flatMap[A, B](ma: M[A])(f: A => M[B]): M[B]
+    ```
+  ]
+]
+
+== Famous Monads
+
+=== Absence of value
+```scala Option[A]```: captures computations that may fail or return nothing.
+
+=== Typed Failures
+```scala Either[E, A]```: captures computations that may fail with an error.
+
+=== State manipulation
+```scala State[S, A]```: captures computations that manipulate state.
+
+=== Input/Output
+```scala IO[A]```: captures computations that perform input/output operations.
+
+== IO Example
+
+The ```scala IO``` monad is a way to model *input/output* operations in a #bold[pure functional setting].
+
+```scala
+final case class IO[A](unsafeRun: () => A)
+```
+- The `IO` type wraps a computation that produces a value of type `A` when executed.
+- The `unsafeRun` field is a function that, when called, performs the actual I/O operation and returns the result.
+
+```scala
+given Monad[IO] with
+  def pure[A](value: A): IO[A] = IO(() => value)
+  def flatMap[A, B](io: IO[A])(f: A => IO[B]): IO[B] =
+    IO(() => f(io.unsafeRun()).unsafeRun())
+```
+
+#uncover("2")[
+  #warning-block("Do not use it in production!")[
+    It #underline[lacks] features like #bold[error handling], #bold[resource management], and #bold[concurrency support].
+  ]
+]
+
+#pagebreak()
+
+Once we have the `IO` monad, we can model side-effecting computations in a pure way. For example, we can define functions to read from the console and write to it:
+
+```scala
+object IO:
+  def putLine(s: String): IO[Unit] = IO(() => println(s))
+  def getLine: IO[String] = IO(() => scala.io.StdIn.readLine())
+```
+
+For-comprehensions can be used to sequence these operations while keeping track of the effects:
+
+```scala
+def echo: IO[Unit] = for
+  _ <- IO.putLine("Enter something:")
+  input <- IO.getLine
+  _ <- IO.putLine(s"You entered: $input")
+yield ()
+```
+
+== End-of-the-World Problems
+
+Trying to execute the code above we will get the following result:
+
+```scala
+IO(io.github.nicolasfara.intro.IO$given_Monad_IO$$$Lambda/0x00007f6c5569cf70)
+```
+
+This represents a value of type ```scala IO[Unit]```, which is a *description of the computation* we want to perform.
+
+It hasn't actually executed the side effects yet. To run the side effects, we need to call `unsafeRun`:
+
+```scala
+echo.unsafeRun()
+```
+
+At this point, the side effects #bold[will be executed], and we will see the following output in the console:
+
+```
+What is your name?
+Nicolas
+Hello, Nicolas!
+```

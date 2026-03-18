@@ -65,7 +65,7 @@
     ),
     clip: true,
     [
-      #block(width: 100%, height: 0.1em, fill: accent-color)[]
+      #block(width: 100%, height: 0.1em, fill: stroke-color)[]
       #block(
         width: 100%,
         inset: (x: 0.72em, top: 0.5em, bottom: 0.5em),
