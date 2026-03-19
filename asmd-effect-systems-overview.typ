@@ -65,6 +65,11 @@
       show math.equation: set text(font: "Fira Math")
 
       show raw: set text(size: 1em, font: "JetBrains Mono")
+      // set raw(syntaxes: "Scala3/Scala 3.sublime-syntax")
+      show link: set text(
+        fill: rgb("#c46a11"),
+        weight: "medium",
+      )
 
       show bibliography: set text(size: 0.75em)
       show footnote.entry: set text(size: 0.75em)
@@ -557,3 +562,159 @@ yield ()
     case Some(_) => println("Unexpected success")
     case None => println("Expected failure") 
 ```
+
+== The order matters
+
+The order of monad transformers in a stack matters because it determines how effects are combined and how computations are executed.
+
+```scala
+type Stack1[A] = StateT[[V] =>> OptionT[IO, V], String, A]
+type Stack2[A] = OptionT[[V] =>> StateT[IO, String, V], A]
+```
+
+#components.side-by-side(inset: 0.7em)[
+  #align(center + horizon)[
+    #cetz.canvas(length: 1cm, {
+      import cetz.draw: *
+
+      circle(
+        (0, 0),
+        radius: 3.1,
+        fill: rgb("#fff3e0"),
+        stroke: (paint: rgb("#e66a00"), thickness: 1.1pt),
+      )
+      circle(
+        (0, 0),
+        radius: 2.2,
+        fill: rgb("#fff7d6"),
+        stroke: (paint: rgb("#c69214"), thickness: 1.1pt),
+      )
+      circle(
+        (0, 0),
+        radius: 1.25,
+        fill: rgb("#edf4f5"),
+        stroke: (paint: rgb("#23373b"), thickness: 1.1pt),
+      )
+
+      content((0, 2.55), text(weight: "bold", fill: rgb("#e66a00"))[`IO`])
+      content((0, 1.55), text(weight: "bold", fill: rgb("#8a6100"))[`Option`])
+      content((0, 0), text(weight: "bold", fill: rgb("#23373b"))[`State`])
+    })
+    #v(0.35em)
+    #text(weight: "bold")[`Stack1`]
+    #text(size: 0.9em, fill: rgb("#8a6100"))[Failure discards state.]
+  ]
+][
+  #align(center + horizon)[
+    #cetz.canvas(length: 1cm, {
+      import cetz.draw: *
+
+      circle(
+        (0, 0),
+        radius: 3.1,
+        fill: rgb("#fff3e0"),
+        stroke: (paint: rgb("#e66a00"), thickness: 1.1pt),
+      )
+      circle(
+        (0, 0),
+        radius: 2.2,
+        fill: rgb("#edf4f5"),
+        stroke: (paint: rgb("#23373b"), thickness: 1.1pt),
+      )
+      circle(
+        (0, 0),
+        radius: 1.25,
+        fill: rgb("#fff7d6"),
+        stroke: (paint: rgb("#c69214"), thickness: 1.1pt),
+      )
+
+      content((0, 2.55), text(weight: "bold", fill: rgb("#e66a00"))[`IO`])
+      content((0, 1.55), text(weight: "bold", fill: rgb("#23373b"))[`State`])
+      content((0, 0), text(weight: "bold", fill: rgb("#8a6100"))[`Option`])
+    })
+    #v(0.35em)
+    #text(weight: "bold")[`Stack2`]
+    #text(size: 0.9em, fill: rgb("#2e7d32"))[Failure preserves state.]
+  ]
+]
+
+== Parser with Monad Stacks
+
+```scala
+type State[S, A] = StateT[Identity, S, A]
+type Parser[A] = OptionT[[V] =>> State[String, V], A]
+
+extension [A](parser: Parser[A])
+  def parse(input: String): (Option[A], String) =
+    parser.runOptionT.runStateT(input)
+
+// Parser combinators
+def fail[A]: Parser[A] = OptionT.fail
+def get: Parser[String] = StateT.get.lift
+def set(value: String): Parser[Unit] = StateT.set(value).lift
+```
+
+#slide[
+```scala
+val input = "abc"
+val parser: Parser[Unit] = for
+  _ <- char('a')
+  _ <- char('b')
+  _ <- char('c')
+yield ()
+
+val (result, remaining) = parser.parse(input)
+result match
+  case Some(_) => println(s"Parsed successfully! Remaining input: '$remaining'")
+  case None => println("Failed to parse.")
+```
+]
+
+== Limits
+
+=== Manual Lifting
+
+- The necessity for manual lifting operations when using monad transformers #bold[#text(fill: red)[complicates code]].
+- Leads to #bold[#text(fill: red)[significant boilerplate]], overshadowing the application's actual logic.
+- Code alteration for stack changes demands #bold[#text(fill: red)[extensive rewriting]].
+
+=== Principle of Least Power
+
+- Fixing the monad stack violates the #bold[principle of least privilege].
+- Forces _unnecessary_ capabilities onto parts of the application.
+
+=== Encapsulation Violation
+
+- Monad transformers #bold[tightly couple] code to specific effect modeling.
+- Ties logic to a specific implementation, severely #bold[hindering future changes].
+
+= Monad Transformer Library (MTL)
+
+#slide[
+  *MTL* is a library that provides a set of type classes and combinators to work with monad transformers in a more modular and composable way.
+
+  #components.side-by-side[
+    === Supported Monad Transformers
+
+    #components.side-by-side[
+      - ```scala EitherT```
+      - ```scala Kleisli```
+      - ```scala IorT```
+      - ```scala OptionT```
+    ][
+      - ```scala ReaderWriterStateT```
+      - ```scala StateT```
+      - ```scala WriterT```
+    ]
+  
+  ][
+    #figure(image("images/cats-mtl.png", width: 50%))
+  ]
+
+
+  ```scala
+  libraryDependencies += "org.typelevel" %% "cats-mtl" % "<version>"
+  ```
+]
+
+== Basic Example

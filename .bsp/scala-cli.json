@@ -1,0 +1,20 @@
+{
+  "name": "scala-cli",
+  "argv": [
+    "/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli",
+    "bsp",
+    "--json-options",
+    "/home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json",
+    "--json-launcher-options",
+    "/home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json",
+    "--envs-file",
+    "/home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json",
+    "/home/nicolas/Documents/repos/asmd-effect-systems-overview"
+  ],
+  "version": "1.9.1",
+  "bspVersion": "2.1.1",
+  "languages": [
+    "scala",
+    "java"
+  ]
+}

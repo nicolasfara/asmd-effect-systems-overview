@@ -1,0 +1,23 @@
+2026.03.19 15:16:29 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.[0m
+2026.03.19 15:16:30 INFO  no build target found for /home/nicolas/Documents/repos/asmd-effect-systems-overview/Scala3/tests/syntax_test_scala3.scala. Using presentation compiler with project's scala-library version: 3.3.7[0m
+2026.03.19 15:16:32 INFO  no build target found for /home/nicolas/Documents/repos/asmd-effect-systems-overview/Scala3/tests/syntax_test_scala3.scala. Using presentation compiler with project's scala-library version: 3.3.7[0m
+2026.03.19 15:16:32 INFO  Running List(/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli, setup-ide, /home/nicolas/Documents/repos/asmd-effect-systems-overview)[0m
+2026.03.19 15:16:32 INFO  Attempting to connect to the build server...[0m
+2026.03.19 15:16:32 INFO  Running BSP server List(/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli, bsp, --json-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json, --json-launcher-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json, --envs-file, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json, /home/nicolas/Documents/repos/asmd-effect-systems-overview)[0m
+2026.03.19 15:16:32 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at /home/nicolas/Documents/repos/asmd-effect-systems-overview/.metals/bsp.trace.json or /home/nicolas/.cache/metals/bsp.trace.json[0m
+2026.03.19 15:16:32 INFO  time: Connected to build server in 0.3s[0m
+2026.03.19 15:16:33 INFO  Connected to Build server: scala-cli v1.9.1[0m
+2026.03.19 15:16:32 INFO  compiling asmd-effect-systems-overview_d5c0a6989e (1 scala source)[0m
+mar 19, 2026 3:16:33 PM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+AVVERTENZA: Unmatched cancel notification for request id 8
+2026.03.19 15:16:34 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.[0m
+2026.03.19 15:16:35 INFO  time: compiled asmd-effect-systems-overview_d5c0a6989e in 1.98s[0m
+2026.03.19 15:16:35 INFO  compiling asmd-effect-systems-overview_d5c0a6989e (1 scala source)[0m
+2026.03.19 15:16:35 INFO  Created report: Optional.empty[0m
+2026.03.19 15:16:35 INFO  source file not found: <WORKSPACE>/Scala3/tests/syntax_test_scala3.scala (full report at: "/home/nicolas/Documents/repos/asmd-effect-systems-overview/.metals/.reports/bloop/2026-03-19/r_source file not foun..._15-16-35-450.md")[0m
+2026.03.19 15:16:35 WARN  Invalid text document uri received from build server: file:///home/nicolas/Documents/repos/asmd-effect-systems-overview/Scala3/tests/syntax_test_scala3.scala[0m
+2026.03.19 15:16:35 INFO  time: compiled asmd-effect-systems-overview_d5c0a6989e in 0.13s[0m
+2026.03.19 15:16:35 INFO  time: indexed workspace in 2.64s[0m
+2026.03.19 15:16:35 INFO  Cancelling compilation on scala-cli server[0m
+2026.03.19 15:16:36 INFO  time: indexed workspace in 0.96s[0m
+2026.03.19 15:16:36 WARN  no build target for: /home/nicolas/Documents/repos/asmd-effect-systems-overview/Scala3/tests/syntax_test_scala3.scala[0m
