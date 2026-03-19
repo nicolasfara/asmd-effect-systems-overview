@@ -18,6 +18,22 @@
   inset: 0.35em,
 )
 
+#let theorem = thmbox("theorem", "Theorem", fill: rgb("#eeffee"))
+#let corollary = thmplain(
+  "corollary",
+  "Corollary",
+  base: "theorem",
+  titlefmt: strong
+)
+#let definition = thmbox(
+  "definition",
+  "Definition",
+  stroke: rgb("#23373b").lighten(80%) + 1pt
+).with(numbering: none)
+
+#let example = thmplain("example", "Example").with(numbering: none)
+#let proof = thmproof("proof", "Proof")
+
 #show: metropolis-theme.with(
   aspect-ratio: "16-9",
   footer: self => self.info.institution,
@@ -295,57 +311,234 @@ Nicolas
 Hello, Nicolas!
 ```
 
-#pagebreak()
+#slide[
+  #components.side-by-side(inset: 0.5em)[
+    #feature-block("The key separation")[
+      We clearly separate the *description* of the computation from its *execution*.
 
-#components.side-by-side(inset: 0.5em)[
-  #feature-block("The key separation")[
-    We clearly separate the *description* of the computation from its *execution*.
+      // - ```scala IO[Unit]``` lives in the #bold[pure world]: it is just a value.
+      // - ```scala unsafeRun``` crosses the boundary into the #bold[impure world], where effects actually happen.
+    ]
 
-    // - ```scala IO[Unit]``` lives in the #bold[pure world]: it is just a value.
-    // - ```scala unsafeRun``` crosses the boundary into the #bold[impure world], where effects actually happen.
+    #warning-block("Do not break the boundary")[
+      The #bold[effects] should only be executed at the "end of the world",
+      and not inside the pure code.
+    ]
+  ][
+    #align(center + horizon)[
+      #cetz.canvas(length: 1.5cm, {
+        import cetz.draw: *
+
+        circle(
+          (0, 0),
+          radius: 3.2,
+          fill: rgb("#fff3e0"),
+          stroke: (paint: rgb("#e66a00"), thickness: 1.2pt),
+        )
+        circle(
+          (0, 0),
+          radius: 1.7,
+          fill: rgb("#edf4f5"),
+          stroke: (paint: rgb("#23373b"), thickness: 1.2pt),
+        )
+
+        content(
+          (0, 2.25),
+          text(weight: "bold", fill: rgb("#e65100"))[Impure world],
+        )
+        content(
+          (0, 0),
+          text(weight: "bold", fill: rgb("#23373b"))[Pure world],
+        )
+        content(
+          (0, -2.35),
+          box(
+            inset: 0.5em,
+            radius: 999pt,
+            fill: white,
+            stroke: (paint: rgb("#e66a00"), thickness: 0.8pt),
+          )[
+            #text(weight: "bold", fill: rgb("#e66a00"))[`unsafeRun`]
+          ],
+        )
+      })
+    ]
+  ]
+]
+
+#slide[
+  Consider the following code:
+
+  ```scala
+  def program: IO[Unit] = for
+    _ <- IO.putLine("What is your name?")
+    name = IO.getLine.unsafeRun() // <-- breaking the boundary!
+    _ <- IO.putLine(s"Hello, $name!")
+  yield ()
+  ```
+
+  ```scala name = IO.getLine.unsafeRun()``` breaks the boundary by executing the side effect inside the pure code:
+
+  - Side effects #bold[leak] into code that should stay pure.
+  - Effects happen #bold[now], not at the end of the world.
+  - Testing gets harder because #bold[control is lost].
+]
+
+== Composing Effects
+
+#feature-block("It's a matter of composition")[
+  Real-world programs typically involve #bold[multiple effects] (e.g., state, I/O, exceptions) that need to be *combined* and *managed* together.
+]
+
+We need to find a way to #underline[compose different effects] in a modular and flexible way, allowing us to build complex programs while keeping the benefits of *purity* and *strong typing*.
+
+== Motivating Example
+
+=== Parser
+
+A _parser_ can be seen as a computation that takes an input string and produces either a parsed value or an error if the input is invalid.
+
+```scala
+final case class Parser[A](parse: String => Option[(A, String)])
+```
+
+Taking the ```scala String``` as input, it produces an ```scala Option``` that can either be ```scala Some``` with a tuple of the parsed value and the remaining string, or ```scala None``` if parsing fails.
+
+```scala
+given Monad[Parser] with
+  def pure[A](a: A): Parser[A] = Parser(input => Some((a, input)))
+  def flatMap[A, B](fa: Parser[A])(f: A => Parser[B]): Parser[B] = Parser: input =>
+    fa.parse(input) match
+      case Some((a, rest)) => f(a).parse(rest)
+      case None => None
+```
+
+#slide[
+  We can easily *combine* parsers logics to build more complex ones.
+  
+  ```scala
+  def char(c: Char): Parser[Unit] = Parser:
+    case input if input.nonEmpty && input.head == c => Some(((), input.tail))
+    case _ => None
+
+  def aab(): Parser[Unit] = for
+    _ <- Parser.char('a')
+    _ <- Parser.char('a')
+    _ <- Parser.char('b')
+  yield ()
+
+  val input = "aab"
+  val result = Parser.aab().parse(input)
+  println(result) // Output: Some(((), ""))
+  ```
+]
+
+#focus-slide[We can do *better*]
+
+#slide[
+  The way we defined our ```scala Parser``` is similar to a ```scala State``` monad.
+
+  ```scala
+  final case class Parser[A](parse: String => Option[(A, String)])
+  final case class State[S, A](run: S => (A, S))
+  ```
+
+  We can express the parser as a combination of:
+  - ```scala State``` holding the input string as state.
+  - ```scala Option``` representing the possibility of failure.
+
+  We want to #bold["stack"] these effects together in a modular way, allowing us to *reuse* and *compose* them without having to #underline[rewrite the logic] for each new combination of effects.
+]
+
+= Monad Stacks
+
+#slide[
+  #definition[
+    A monad transformer is a _type constructor_ that takes a monad as an argument and returns a new monad that combines the effects of both monads.
   ]
 
-  #warning-block("Do not break the boundary")[
-    The #bold[effects] should only be executed at the "end of the world",
-    and not inside the pure code.
-  ]
-][
-  #align(center + horizon)[
-    #cetz.canvas(length: 1.5cm, {
-      import cetz.draw: *
+  - Allows us to #underline[compose effects] in a modular way.
+  - Avoids the #bold[boilerplate] of deeply nested monads.
+  - Provides a #bold[unified interface] for working with multiple effects together.
 
-      circle(
-        (0, 0),
-        radius: 3.2,
-        fill: rgb("#fff3e0"),
-        stroke: (paint: rgb("#e66a00"), thickness: 1.2pt),
-      )
-      circle(
-        (0, 0),
-        radius: 1.7,
-        fill: rgb("#edf4f5"),
-        stroke: (paint: rgb("#23373b"), thickness: 1.2pt),
-      )
+  === Notable Monad Stacks
+  - ```scala EitherT[M[_], E, A]```: combines an effect `M` with error handling.
+  - ```scala StateT[M[_], S, A]```: combines an effect `M` with state manipulation.
+  - ```scala ReaderT[M[_], R, A]```: combines an effect `M` with read-only environment access.
+  - ```scala OptionT[M[_], A]```: combines an effect `M` with optional values.
+]
 
-      content(
-        (0, 2.25),
-        text(weight: "bold", fill: rgb("#e65100"))[Impure world],
-      )
-      content(
-        (0, 0),
-        text(weight: "bold", fill: rgb("#23373b"))[Pure world],
-      )
-      content(
-        (0, -2.35),
-        box(
-          inset: 0.5em,
-          radius: 999pt,
-          fill: white,
-          stroke: (paint: rgb("#e66a00"), thickness: 0.8pt),
-        )[
-          #text(weight: "bold", fill: rgb("#e66a00"))[unsafeRun]
-        ],
-      )
-    })
-  ]
+== Monad Transformers
+
+Monad stacks are also called *monad transformers* because they allow us to "transform" one monad into another by adding additional effects on top of it.
+
+Given a base monad ```scala M[_]``` (e.g., ```scala IO```),
+and a #bold[transformer] ```scala T```, then ```scala T[M, A]``` (e.g., ```scala EitherT[IO, String, Int]```) is a new monad with ```scala M``` inside it.
+
+```scala StateT[String, OptionT[IO, _], A]``` is a state monad + option + IO, allowing us to manage state, handle optional values, and perform I/O operations all in one monad.
+
+== Monad Transformer Definition
+
+A monad transformer can be seen as a typle of the form `(T, lift)` where:
+- `T` is a *type constructor* that takes a monad `M` and produces a new monad `T[M, A]`.
+- `lift` is a *polymorphic function* that takes a computation in the base monad `M` and #bold[lifts] it into the transformed monad `T[M, A]`.
+
+```scala
+trait MonadTransformer[T[_[_], _]]:
+  def lift[M[_]: Monad, A](ma: M[A]): T[M, A]
+```
+
+The ```scala lift``` function is a way to #bold[inject] computations from the base monad into the transformed monad.
+
+== Example -- OptionT
+
+```scala
+final case class OptionT[M[_], A](value: M[Option[A]])
+
+given MonadTransformer[OptionT] with
+  def lift[M[_]: Monad, A](ma: M[A]): OptionT[M, A] = OptionT(ma.map(Some(_)))
+```
+
+#align(center + horizon)[
+  #cetz.canvas(length: 1cm, {
+    import cetz.draw: *
+
+    circle(
+      (0, 0),
+      radius: 3.1,
+      fill: rgb("#edf4f5"),
+      stroke: (paint: rgb("#23373b"), thickness: 1.1pt),
+    )
+    circle(
+      (0, 0),
+      radius: 1.8,
+      fill: rgb("#fff3e0"),
+      stroke: (paint: rgb("#e66a00"), thickness: 1.1pt),
+    )
+
+    content(
+      (0, 2.2),
+      text(weight: "bold", fill: rgb("#23373b"))[`M[_]`],
+    )
+    content(
+      (0, 0.45),
+      text(weight: "bold", fill: rgb("#e66a00"))[`Option`],
+    )
+    content(
+      (0, -0.55),
+      text(size: 0.95em, fill: rgb("#23373b"))[`A`],
+    )
+
+    content(
+      (0, -4.0),
+      box(
+        inset: 0.22em,
+        radius: 999pt,
+        fill: white,
+        stroke: (paint: rgb("#23373b").lighten(60%), thickness: 0.8pt),
+      )[
+        #text(size: 0.9em)[`OptionT[M, A] = M[Option[A]]`]
+      ],
+    )
+  })
 ]

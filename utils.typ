@@ -1,4 +1,6 @@
 #import "@preview/fontawesome:0.6.0": *
+#import "@preview/touying:0.6.3": *
+#import themes.metropolis: *
 
 /// #mail
 ///
