@@ -479,7 +479,7 @@ and a #bold[transformer] ```scala T```, then ```scala T[M, A]``` (e.g., ```scala
 
 == Monad Transformer Definition
 
-A monad transformer can be seen as a typle of the form `(T, lift)` where:
+A monad transformer can be seen as a tuple of the form `(T, lift)` where:
 - `T` is a *type constructor* that takes a monad `M` and produces a new monad `T[M, A]`.
 - `lift` is a *polymorphic function* that takes a computation in the base monad `M` and #bold[lifts] it into the transformed monad `T[M, A]`.
 
@@ -532,7 +532,7 @@ given MonadTransformer[OptionT] with
     content(
       (0, -4.0),
       box(
-        inset: 0.22em,
+        inset: 0.5em,
         radius: 999pt,
         fill: white,
         stroke: (paint: rgb("#23373b").lighten(60%), thickness: 0.8pt),
@@ -542,3 +542,18 @@ given MonadTransformer[OptionT] with
     )
   })
 ]
+
+== OptionT and IO
+
+```scala
+def failAndIO: OptionT[IO, Unit] = for
+  _ <- IO.putLine("This will fail").lift[OptionT]
+  _ <- OptionT.fail[IO, Unit]
+  _ <- IO.putLine("This will never be printed").lift[OptionT]
+yield ()
+
+@main def runMonadStack(): Unit =
+  failAndIO.runOptionT.unsafeRun() match
+    case Some(_) => println("Unexpected success")
+    case None => println("Expected failure") 
+```
