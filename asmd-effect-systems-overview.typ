@@ -5,6 +5,7 @@
 #import "@preview/numbly:0.1.0": numbly
 #import "@preview/codly:1.3.0": *
 #import "@preview/codly-languages:0.1.1": *
+#import "@preview/cetz:0.4.2"
 #import "utils.typ": *
 
 #show: codly-init.with()
@@ -252,7 +253,7 @@ given Monad[IO] with
 
 #pagebreak()
 
-Once we have the `IO` monad, we can model side-effecting computations in a pure way. For example, we can define functions to read from the console and write to it:
+Once we have the ```scala IO``` monad, we can model side-effecting computations in a *pure way*. For example, we can define functions to read from the console and write to it:
 
 ```scala
 object IO:
@@ -270,7 +271,7 @@ def echo: IO[Unit] = for
 yield ()
 ```
 
-== End-of-the-World Problems
+== End-of-the-World Principle
 
 Trying to execute the code above we will get the following result:
 
@@ -293,3 +294,58 @@ What is your name?
 Nicolas
 Hello, Nicolas!
 ```
+
+#pagebreak()
+
+#components.side-by-side(inset: 0.5em)[
+  #feature-block("The key separation")[
+    We clearly separate the *description* of the computation from its *execution*.
+
+    // - ```scala IO[Unit]``` lives in the #bold[pure world]: it is just a value.
+    // - ```scala unsafeRun``` crosses the boundary into the #bold[impure world], where effects actually happen.
+  ]
+
+  #warning-block("Do not break the boundary")[
+    The #bold[effects] should only be executed at the "end of the world",
+    and not inside the pure code.
+  ]
+][
+  #align(center + horizon)[
+    #cetz.canvas(length: 1.5cm, {
+      import cetz.draw: *
+
+      circle(
+        (0, 0),
+        radius: 3.2,
+        fill: rgb("#fff3e0"),
+        stroke: (paint: rgb("#e66a00"), thickness: 1.2pt),
+      )
+      circle(
+        (0, 0),
+        radius: 1.7,
+        fill: rgb("#edf4f5"),
+        stroke: (paint: rgb("#23373b"), thickness: 1.2pt),
+      )
+
+      content(
+        (0, 2.25),
+        text(weight: "bold", fill: rgb("#e65100"))[Impure world],
+      )
+      content(
+        (0, 0),
+        text(weight: "bold", fill: rgb("#23373b"))[Pure world],
+      )
+      content(
+        (0, -2.35),
+        box(
+          inset: 0.5em,
+          radius: 999pt,
+          fill: white,
+          stroke: (paint: rgb("#e66a00"), thickness: 0.8pt),
+        )[
+          #text(weight: "bold", fill: rgb("#e66a00"))[unsafeRun]
+        ],
+      )
+    })
+  ]
+]
