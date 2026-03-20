@@ -790,3 +790,191 @@ type ProductionRunner[A] = StateT[Runtime, IO, A]
 final case class Runtime(users: Map[UserId, User])
 type InMemoryRunner[A] = State[Runtime, A]
 ```
+
+= Tagless Final Encoding
+
+#slide[
+  #feature-block("What problem is left?")[
+    *MTL* improves ergonomics, but our business logic can still end up coupled to *how* effects are implemented instead of just *which capabilities* it needs.
+  ]
+
+  - Domain code should depend on capabilities like ```scala UserStore```, not on a concrete transformer stack.
+  - If we replace the stack, we should not have to #bold[rewrite the program].
+  - The same logic should run against different interpreters: #bold[in memory] for tests, #bold[database + IO] in production.
+  - These capabilities are *application-specific algebras*, not only generic effects.
+
+  #warning-block("Tagless-final move")[
+    Encode capabilities as interfaces over ```scala F[_]```, then provide the concrete interpreter later.
+  ]
+]
+
+#slide[
+  #feature-block("The core idea")[
+    A tagless-final program is a #bold[polymorphic program]: it does not commit to a concrete effect type, only to the operations it requires.
+  ]
+
+  ```scala
+  def program[F[_]](/* required capabilities */): F[Result]
+  ```
+
+  - ```scala F[_]``` is left abstract.
+  - Type class constraints describe the #bold[capabilities] the program needs.
+  - Concrete effect stacks appear only when we choose an #bold[interpreter].
+]
+
+#slide[
+  #feature-block("Algebras describe capabilities")[
+    In tagless final, we package domain-specific effects as small interfaces, often called *algebras*.
+  ]
+
+  ```scala
+  trait UserStore[F[_]]:
+    def get(userId: UserId): F[Option[User]]
+    def save(user: User): F[Unit]
+    def delete(userId: UserId): F[Unit]
+  ```
+
+  - This says nothing about #bold[how] users are stored.
+  - It only states which operations are available for any effect ```scala F```.
+  - The algebra belongs to the #bold[domain], not to a specific monad transformer stack.
+]
+
+#slide[
+  #feature-block("Programs stay abstract")[
+    Business logic depends on the algebra and on generic capabilities such as ```scala Monad```.
+  ]
+
+  ```scala
+  def updateOrDelete[F[_]: Monad: UserStore](
+      user: User
+  )(f: User => User | Delete): F[Unit] =
+    f(user) match
+      case updated: User => summon[UserStore[F]].save(updated)
+      case Delete => summon[UserStore[F]].delete(user.id)
+  ```
+
+  - The function signature tells us exactly what the program needs.
+  - No concrete ```scala EitherT[StateT[...], ...]``` appears in the domain logic.
+  - If the runtime changes, this function stays the same.
+]
+
+#slide[
+  #feature-block("Interpreters choose the runtime")[
+    The same tagless-final program can be interpreted in different concrete effect types.
+  ]
+
+  ```scala
+  given UserStore[ProductionRunner] = ???
+  given UserStore[InMemoryRunner] = ???
+
+  val prod: ProductionRunner[Unit] =
+    updateOrDelete[ProductionRunner](user)(f)
+
+  val test: InMemoryRunner[Unit] =
+    updateOrDelete[InMemoryRunner](user)(f)
+  ```
+
+  The program is *reused*; only the interpreter #bold[changes].
+]
+
+#slide[
+  #components.side-by-side(inset: 0.7em)[
+    #warning-block("Fixed stack style")[
+      - Chooses the full effect representation too early.
+      - Leaks implementation details into business logic.
+      - Makes interpreter changes expensive.
+    ]
+  ][
+    #feature-block("Tagless-final style")[
+      - Abstracts over ```scala F[_]``` and required capabilities.
+      - Keeps domain logic focused on operations, not plumbing.
+      - Lets interpreters evolve independently.
+    ]
+  ]
+]
+
+== Concrete Examples
+
+#slide[
+  #feature-block("A monadic tagless-final program")[
+    The real payoff appears when we sequence multiple effectful operations with a monad.
+  ]
+
+  ```scala
+  trait UserStore[F[_]]:
+    def get(userId: UserId): F[Option[User]]
+    def save(user: User): F[Unit]
+  ```
+
+  #pagebreak()
+
+  Then we can write our domain logic as a monadic program:
+
+  ```scala
+  def renameUser[F[_]: Monad: UserStore](
+      userId: UserId,
+      newName: String
+  )(using MonadError[F, String]): F[Unit] =
+    for
+      maybeUser <- summon[UserStore[F]].get(userId)
+      user <- maybeUser match
+        case Some(user) => user.pure[F]
+        case None => summon[MonadError[F, String]].raiseError("User not found")
+      _ <- summon[UserStore[F]].save(user.copy(name = newName))
+    yield ()
+  ```
+]
+
+#slide[
+  #feature-block("Interpreter 1: pure in-memory testing")[
+    For tests we can use a small stateful interpreter with no real I/O.
+  ]
+
+  ```scala
+  type TestRunner[A] = State[Map[UserId, User], A]
+
+  given UserStore[TestRunner] with
+    def get(userId: UserId): TestRunner[Option[User]] =
+      State.inspect(_.get(userId))
+
+    def save(user: User): TestRunner[Unit] =
+      State.modify(_.updated(user.id, user))
+  ```
+
+  - Good for fast tests and deterministic behaviour.
+  - The program stays exactly the same: only the interpreter changes.
+]
+
+#slide[
+  #feature-block("Interpreter 2: effectful production")[
+    In production we can interpret the same algebra with a monad that performs real effects.
+  ]
+
+  ```scala
+  type ProdRunner[A] = EitherT[IO, String, A]
+
+  given UserStore[ProdRunner] with
+    def get(userId: UserId): ProdRunner[Option[User]] =
+      EitherT.liftF(database.load(userId))
+
+    def save(user: User): ProdRunner[Unit] = EitherT.liftF(database.update(user))
+
+  val result: ProdRunner[Unit] = renameUser[ProdRunner](userId, "Alice")
+  ```
+]
+
+#slide[
+  #components.side-by-side(inset: 0.7em)[
+    #feature-block("What the monad gives us")[
+      - Sequencing with ```scala for```-comprehensions.
+      - Access to generic combinators like ```scala pure``` and ```scala flatMap```.
+      - A uniform way to compose domain operations.
+    ]
+  ][
+    #warning-block("What tagless final gives us")[
+      - The program depends on capabilities, not implementations.
+      - Interpreters can be swapped for testing or production.
+      - Domain logic remains reusable as the runtime evolves.
+    ]
+  ]
+]

@@ -267,3 +267,167 @@ Mar 20, 2026 12:28:35 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint noti
 INFO: Unsupported notification method: $/setTrace
 Mar 20, 2026 12:28:35 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
 INFO: Unsupported notification method: $/setTrace
+2026.03.20 13:25:39 INFO  Shutting down server[0m
+2026.03.20 13:25:39 INFO  Memory monitor stopped[0m
+2026.03.20 13:25:39 INFO  shutting down Metals[0m
+2026.03.20 13:25:39 INFO  Exiting server[0m
+2026.03.20 13:26:14 INFO  Started: Metals version 1.6.6 in folders '/home/nicolas/Documents/repos/asmd-effect-systems-overview' for client Visual Studio Code 1.109.5.
+2026.03.20 13:26:14 INFO  Memory monitor started
+Mar 20, 2026 1:26:15 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+2026.03.20 13:26:15 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.03.20 13:26:15 INFO  Attempting to connect to the build server...
+2026.03.20 13:26:15 INFO  Running BSP server List(/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli, bsp, --json-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json, --json-launcher-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json, --envs-file, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json, /home/nicolas/Documents/repos/asmd-effect-systems-overview)
+2026.03.20 13:26:15 ERROR Running process '/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli bsp --json-options /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json --json-launcher-options /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json --envs-file /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json /home/nicolas/Documents/repos/asmd-effect-systems-overview' failed
+java.io.IOException: Cannot run program "/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli" (in directory "/home/nicolas/Documents/repos/asmd-effect-systems-overview"): Exec failed, error: 2 (No such file or directory) 
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1170)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1089)
+	at scala.meta.internal.process.SystemProcess$.run(SystemProcess.scala:48)
+	at scala.meta.internal.bsp.BspServers.newConnection$1(BspServers.scala:129)
+	at scala.meta.internal.bsp.BspServers.$anonfun$newServer$8(BspServers.scala:172)
+	at scala.meta.internal.metals.BuildServerConnection$.setupServer$1(BuildServerConnection.scala:631)
+	at scala.meta.internal.metals.BuildServerConnection$.fromSockets(BuildServerConnection.scala:700)
+	at scala.meta.internal.bsp.BspServers.newServer(BspServers.scala:167)
+	at scala.meta.internal.bsp.BspConnector.connect$1(BspConnector.scala:185)
+	at scala.meta.internal.bsp.BspConnector.connect(BspConnector.scala:260)
+	at scala.meta.internal.metals.ConnectionProvider$Connect$.$anonfun$createSession$7(ConnectionProvider.scala:586)
+	at scala.concurrent.impl.Promise$Transformation.run(Promise.scala:503)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.lang.Thread.run(Thread.java:1583)
+Caused by: java.io.IOException: Exec failed, error: 2 (No such file or directory) 
+	at java.lang.ProcessImpl.forkAndExec(Native Method)
+	at java.lang.ProcessImpl.<init>(ProcessImpl.java:295)
+	at java.lang.ProcessImpl.start(ProcessImpl.java:225)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1126)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1089)
+	at scala.meta.internal.process.SystemProcess$.run(SystemProcess.scala:48)
+	at scala.meta.internal.bsp.BspServers.newConnection$1(BspServers.scala:129)
+	at scala.meta.internal.bsp.BspServers.$anonfun$newServer$8(BspServers.scala:172)
+	at scala.meta.internal.metals.BuildServerConnection$.setupServer$1(BuildServerConnection.scala:631)
+	at scala.meta.internal.metals.BuildServerConnection$.fromSockets(BuildServerConnection.scala:700)
+	at scala.meta.internal.bsp.BspServers.newServer(BspServers.scala:167)
+	at scala.meta.internal.bsp.BspConnector.connect$1(BspConnector.scala:185)
+	at scala.meta.internal.bsp.BspConnector.connect(BspConnector.scala:260)
+	at scala.meta.internal.metals.ConnectionProvider$Connect$.$anonfun$createSession$7(ConnectionProvider.scala:586)
+	at scala.concurrent.impl.Promise$Transformation.run(Promise.scala:503)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.lang.Thread.run(Thread.java:1583)
+
+2026.03.20 13:26:15 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at /home/nicolas/Documents/repos/asmd-effect-systems-overview/.metals/bsp.trace.json or /home/nicolas/.cache/metals/bsp.trace.json
+Mar 20, 2026 1:26:15 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+Mar 20, 2026 1:26:15 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+2026.03.20 13:27:15 ERROR Timeout waiting for 'build/initialize' response
+2026.03.20 13:27:15 WARN  Retrying connection to the build server scala-cli
+2026.03.20 13:27:15 INFO  Running BSP server List(/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli, bsp, --json-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json, --json-launcher-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json, --envs-file, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json, /home/nicolas/Documents/repos/asmd-effect-systems-overview)
+2026.03.20 13:27:15 ERROR Running process '/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli bsp --json-options /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json --json-launcher-options /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json --envs-file /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json /home/nicolas/Documents/repos/asmd-effect-systems-overview' failed
+java.io.IOException: Cannot run program "/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli" (in directory "/home/nicolas/Documents/repos/asmd-effect-systems-overview"): Exec failed, error: 2 (No such file or directory) 
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1170)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1089)
+	at scala.meta.internal.process.SystemProcess$.run(SystemProcess.scala:48)
+	at scala.meta.internal.bsp.BspServers.newConnection$1(BspServers.scala:129)
+	at scala.meta.internal.bsp.BspServers.$anonfun$newServer$8(BspServers.scala:172)
+	at scala.meta.internal.metals.BuildServerConnection$.setupServer$1(BuildServerConnection.scala:631)
+	at scala.meta.internal.metals.BuildServerConnection$.fromSockets(BuildServerConnection.scala:700)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:717)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:714)
+	at scala.concurrent.impl.Promise$Transformation.run(Promise.scala:523)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.lang.Thread.run(Thread.java:1583)
+Caused by: java.io.IOException: Exec failed, error: 2 (No such file or directory) 
+	at java.lang.ProcessImpl.forkAndExec(Native Method)
+	at java.lang.ProcessImpl.<init>(ProcessImpl.java:295)
+	at java.lang.ProcessImpl.start(ProcessImpl.java:225)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1126)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1089)
+	at scala.meta.internal.process.SystemProcess$.run(SystemProcess.scala:48)
+	at scala.meta.internal.bsp.BspServers.newConnection$1(BspServers.scala:129)
+	at scala.meta.internal.bsp.BspServers.$anonfun$newServer$8(BspServers.scala:172)
+	at scala.meta.internal.metals.BuildServerConnection$.setupServer$1(BuildServerConnection.scala:631)
+	at scala.meta.internal.metals.BuildServerConnection$.fromSockets(BuildServerConnection.scala:700)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:717)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:714)
+	at scala.concurrent.impl.Promise$Transformation.run(Promise.scala:523)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.lang.Thread.run(Thread.java:1583)
+
+2026.03.20 13:27:15 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at /home/nicolas/Documents/repos/asmd-effect-systems-overview/.metals/bsp.trace.json or /home/nicolas/.cache/metals/bsp.trace.json
+2026.03.20 13:28:15 ERROR Timeout waiting for 'build/initialize' response
+2026.03.20 13:28:15 WARN  Retrying connection to the build server scala-cli
+2026.03.20 13:28:15 INFO  Running BSP server List(/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli, bsp, --json-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json, --json-launcher-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json, --envs-file, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json, /home/nicolas/Documents/repos/asmd-effect-systems-overview)
+2026.03.20 13:28:15 ERROR Running process '/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli bsp --json-options /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json --json-launcher-options /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json --envs-file /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json /home/nicolas/Documents/repos/asmd-effect-systems-overview' failed
+java.io.IOException: Cannot run program "/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli" (in directory "/home/nicolas/Documents/repos/asmd-effect-systems-overview"): Exec failed, error: 2 (No such file or directory) 
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1170)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1089)
+	at scala.meta.internal.process.SystemProcess$.run(SystemProcess.scala:48)
+	at scala.meta.internal.bsp.BspServers.newConnection$1(BspServers.scala:129)
+	at scala.meta.internal.bsp.BspServers.$anonfun$newServer$8(BspServers.scala:172)
+	at scala.meta.internal.metals.BuildServerConnection$.setupServer$1(BuildServerConnection.scala:631)
+	at scala.meta.internal.metals.BuildServerConnection$.fromSockets(BuildServerConnection.scala:700)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:717)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:714)
+	at scala.concurrent.impl.Promise$Transformation.run(Promise.scala:523)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.lang.Thread.run(Thread.java:1583)
+Caused by: java.io.IOException: Exec failed, error: 2 (No such file or directory) 
+	at java.lang.ProcessImpl.forkAndExec(Native Method)
+	at java.lang.ProcessImpl.<init>(ProcessImpl.java:295)
+	at java.lang.ProcessImpl.start(ProcessImpl.java:225)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1126)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1089)
+	at scala.meta.internal.process.SystemProcess$.run(SystemProcess.scala:48)
+	at scala.meta.internal.bsp.BspServers.newConnection$1(BspServers.scala:129)
+	at scala.meta.internal.bsp.BspServers.$anonfun$newServer$8(BspServers.scala:172)
+	at scala.meta.internal.metals.BuildServerConnection$.setupServer$1(BuildServerConnection.scala:631)
+	at scala.meta.internal.metals.BuildServerConnection$.fromSockets(BuildServerConnection.scala:700)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:717)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:714)
+	at scala.concurrent.impl.Promise$Transformation.run(Promise.scala:523)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.lang.Thread.run(Thread.java:1583)
+
+2026.03.20 13:28:15 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at /home/nicolas/Documents/repos/asmd-effect-systems-overview/.metals/bsp.trace.json or /home/nicolas/.cache/metals/bsp.trace.json
+2026.03.20 13:29:15 ERROR Timeout waiting for 'build/initialize' response
+2026.03.20 13:29:15 WARN  Retrying connection to the build server scala-cli
+2026.03.20 13:29:15 INFO  Running BSP server List(/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli, bsp, --json-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json, --json-launcher-options, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json, --envs-file, /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json, /home/nicolas/Documents/repos/asmd-effect-systems-overview)
+2026.03.20 13:29:15 ERROR Running process '/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli bsp --json-options /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-options-v2.json --json-launcher-options /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-launcher-options.json --envs-file /home/nicolas/Documents/repos/asmd-effect-systems-overview/.scala-build/ide-envs.json /home/nicolas/Documents/repos/asmd-effect-systems-overview' failed
+java.io.IOException: Cannot run program "/home/nicolas/.cache/scalacli/local-repo/bin/scala-cli/scala-cli" (in directory "/home/nicolas/Documents/repos/asmd-effect-systems-overview"): Exec failed, error: 2 (No such file or directory) 
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1170)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1089)
+	at scala.meta.internal.process.SystemProcess$.run(SystemProcess.scala:48)
+	at scala.meta.internal.bsp.BspServers.newConnection$1(BspServers.scala:129)
+	at scala.meta.internal.bsp.BspServers.$anonfun$newServer$8(BspServers.scala:172)
+	at scala.meta.internal.metals.BuildServerConnection$.setupServer$1(BuildServerConnection.scala:631)
+	at scala.meta.internal.metals.BuildServerConnection$.fromSockets(BuildServerConnection.scala:700)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:717)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:714)
+	at scala.concurrent.impl.Promise$Transformation.run(Promise.scala:523)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.lang.Thread.run(Thread.java:1583)
+Caused by: java.io.IOException: Exec failed, error: 2 (No such file or directory) 
+	at java.lang.ProcessImpl.forkAndExec(Native Method)
+	at java.lang.ProcessImpl.<init>(ProcessImpl.java:295)
+	at java.lang.ProcessImpl.start(ProcessImpl.java:225)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1126)
+	at java.lang.ProcessBuilder.start(ProcessBuilder.java:1089)
+	at scala.meta.internal.process.SystemProcess$.run(SystemProcess.scala:48)
+	at scala.meta.internal.bsp.BspServers.newConnection$1(BspServers.scala:129)
+	at scala.meta.internal.bsp.BspServers.$anonfun$newServer$8(BspServers.scala:172)
+	at scala.meta.internal.metals.BuildServerConnection$.setupServer$1(BuildServerConnection.scala:631)
+	at scala.meta.internal.metals.BuildServerConnection$.fromSockets(BuildServerConnection.scala:700)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:717)
+	at scala.meta.internal.metals.BuildServerConnection$$anonfun$fromSockets$17.applyOrElse(BuildServerConnection.scala:714)
+	at scala.concurrent.impl.Promise$Transformation.run(Promise.scala:523)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.lang.Thread.run(Thread.java:1583)
+
+2026.03.20 13:29:15 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at /home/nicolas/Documents/repos/asmd-effect-systems-overview/.metals/bsp.trace.json or /home/nicolas/.cache/metals/bsp.trace.json
