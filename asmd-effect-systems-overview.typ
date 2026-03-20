@@ -718,3 +718,75 @@ result match
 ]
 
 == Basic Example
+
+We need to make the types *explicit* -- mostly to help the compiler -- but also to make it clear to the reader what effects are being used.
+
+```scala
+def decrementStateBoilerplate: EitherT[StateT[List, Int, *], Exception, String] =
+  for
+    currentState <- EitherT.liftF(StateT.get[List, Int])
+    result <- if (currentState < 0) then
+      EitherT.leftT[[V] =>> StateT[List, Int, V], String](
+        new Exception("State cannot be decremented below zero")
+      )
+    else
+      EitherT.liftF(StateT.set[List, Int](currentState - 1))
+        .as("State decremented successfully!")
+  yield result
+```
+
+#slide[
+We express "capabilities" as *type class constraints*, which allows us to write code with less boilerplate.
+```scala
+def decrementState[F[_]](using
+    Stateful[F, Int], MonadError[F, Exception]
+): F[String] =
+  for
+    currentState <- Stateful.get
+    result <- if (currentState > 0) then
+      Stateful.set(currentState - 1) *> "State decremented successfully!".pure
+    else
+      MonadError[F, Exception].raiseError(
+        new Exception("State cannot be decremented below zero")
+      )
+  yield result
+```
+]
+
+== Write our Domain Logic
+
+We can provide our *effect definition* abstracting over the specific monad stack we will use in our application.
+
+```scala
+trait UserStore[M[_]]:
+  def get(userId: UserId): M[Option[User]]
+  def save(user: User): M[Unit]
+  def delete(userId: UserId): M[Unit]
+```
+
+And provide operations that use these effects to implement our domain logic:
+
+```scala
+def updateOrDelete[M[_]: UserStore](user: User)(f: User => User | Delete): M[Unit]
+```
+
+== Different Interpretations
+
+We can *interpret* the ```scala UserStore``` effect in different ways:
+- #bold[In memory] for testing purposes.
+- #bold[Using a database] for production.
+
+=== Production Setup
+```scala
+final case class DatabaseConnection()
+final case class Runtime(connection: DatabaseConnection)
+
+type ProductionRunner[A] = StateT[Runtime, IO, A]
+```
+
+=== In-Memory Setup
+
+```scala
+final case class Runtime(users: Map[UserId, User])
+type InMemoryRunner[A] = State[Runtime, A]
+```
