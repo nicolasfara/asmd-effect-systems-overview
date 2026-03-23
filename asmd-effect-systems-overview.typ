@@ -90,7 +90,6 @@
 
 // #components.adaptive-columns(outline(title: none, indent: 1em))
 
-= Outline
 
 = It's All About Effects
 
@@ -160,7 +159,7 @@
 == Effect Systems
 
 #feature-block("Effect System")[
-  An effect system is kind of a #bold[type system] that tracks the *side effects* of computations, allowing developers to #underline[reason about] and #underline[control] them more effectively.
+  An effect system is kind of a #bold[type system] that tracks the *effects* of computations, allowing developers to #underline[reason about] and #underline[control] them more effectively.
 ]
 
 === Effect Systems in the Wild
@@ -199,9 +198,30 @@ def getRandom(): Int = Random.nextInt(100)
 - The effect is hidden in the implementation, not reflected in the function's type.
 - Callers may be surprised by the non-deterministic behavior.
 
-== ???
+== From Ad-Hoc Effects to a General Model
 
-Put a slide here motivating the need for a more general and powerful way to control effects, leading to the introduction of monads as a way to structure computations with effects in a pure functional programming language like Haskell.
+#components.side-by-side(inset: 0.5em)[
+  #warning-block("Ad-hoc mechanisms do not scale")[
+    - Checked exceptions only talk about failures.
+    - Randomness, state, logging, and I/O need different mechanisms.
+    - Once a program combines many effects, reasoning becomes fragmented.
+  ]
+][
+  #feature-block("What we really want")[
+    - Keep the language #bold[pure]: computations are still values.
+    - Make effects #bold[explicit in the type], not hidden in the implementation.
+    - Provide one #bold[uniform way] to sequence and compose effectful computations.
+  ]
+]
+
+#pagebreak()
+
+#note-block("The answer", icon: fa-arrow-right() + " ")[
+  Instead of performing effects directly, represent an effectful computation as a value such as `M[A]`.
+  Then use a common interface to combine these values.
+
+  That interface is the idea of a #bold[monad].
+]
 
 = Monadic Effects
 
@@ -229,6 +249,37 @@ Put a slide here motivating the need for a more general and powerful way to cont
     def pure[A](value: A): M[A]
     def flatMap[A, B](ma: M[A])(f: A => M[B]): M[B]
   ```
+]
+
+== Monad Laws
+
+#feature-block("Left identity")[
+  `pure(a).flatMap(f) == f(a)`
+
+  Injecting a value with `pure` and then continuing with `f` should behave exactly like calling `f` directly.
+]
+
+#v(0.5em)
+
+#feature-block("Right identity")[
+  `ma.flatMap(pure) == ma`
+
+  Sequencing a computation and then doing "nothing more" with `pure` should not change the computation.
+]
+
+#pagebreak()
+
+#feature-block("Associativity")[
+  `ma.flatMap(f).flatMap(g) == ma.flatMap(a => f(a).flatMap(g))`
+
+  Grouping effectful steps in different ways must preserve the meaning of the program.
+]
+
+#v(0.6em)
+
+#note-block("Why this matters")[
+  These laws make monadic composition predictable.
+  Without them, refactoring `flatMap` chains or using for-comprehensions could change behavior.
 ]
 
 == Famous Monads
@@ -684,9 +735,9 @@ result match
 
 === Manual Lifting
 
-- The necessity for manual lifting operations when using monad transformers #bold[#text(fill: red)[complicates code]].
-- Leads to #bold[#text(fill: red)[significant boilerplate]], overshadowing the application's actual logic.
-- Code alteration for stack changes demands #bold[#text(fill: red)[extensive rewriting]].
+- The necessity for manual lifting operations when using monad transformers *complicates code*.
+- Leads to *significant boilerplate*, overshadowing the application's actual logic.
+- Code alteration for stack changes demands *extensive rewriting*.
 
 === Principle of Least Power
 
@@ -1008,19 +1059,44 @@ object UserRepository:
 At the #bold[end of the world], we can choose a concrete monad stack that provides the required capabilities and run our program.
 
 ```scala
-  type Eff[A] = EitherT[[V] =>> StateT[IO, Map[UUID, User], V], String, A]
+type Eff[A] = EitherT[[V] =>> StateT[IO, Map[UUID, User], V], String, A]
 
-  val initialUsers: Map[UUID, User] = Map.empty
+val initialUsers: Map[UUID, User] = Map.empty
 
-  def run: IO[Unit] = signup[Eff]("Alice", "alice@bar.com")
-    .value
-    .run(initialUsers)
-    .flatMap:
-      case (newState, Right(_)) =>
-        IO.println("User signed up successfully! New state: " + newState)
-      case (_, Left(error)) =>
-        IO.println(s"Error: $error")
+def run: IO[Unit] = signup[Eff]("Alice", "alice@bar.com")
+  .value
+  .run(initialUsers)
+  .flatMap:
+    case (newState, Right(_)) =>
+      IO.println("User signed up successfully! New state: " + newState)
+    case (_, Left(error)) =>
+      IO.println(s"Error: $error")
 ```
+
+#focus-slide[
+  Wrap up
+]
+
+#slide[
+  #components.side-by-side(columns: (2fr, auto), gutter: 3em)[
+    === Monadic Encoding
+    - Monads are a #bold[powerful] way to model *effects*
+    - Monad stacks allow us to *combine multiple effects* together
+
+    === Tagless Final Encoding
+    - We don't want to commit to a #bold[specific monad stack] in our domain logic
+    - We can write our programs in terms of *capabilities* and provide different *interpreters* for testing and production
+
+    === MTL Library
+    - Provides a *set of type classes* and *combinators* to work with monad transformers in a more modular and composable way
+
+  ][
+    #figure(image("images/cats.png", height: 50%))
+  ]
+]
+
+#focus-slide[What's *next*?]
+
 
 // == Different Interpretations
 
@@ -1043,20 +1119,20 @@ At the #bold[end of the world], we can choose a concrete monad stack that provid
 // type InMemoryRunner[A] = State[Runtime, A]
 // ```
 
-// = Direct Style with Capabilities
+= Direct Style with Capabilities
 
-// == Why Another Style?
+== Why Another Style?
 
-// #feature-block("What changes after tagless final?")[
-//   Tagless final keeps #bold[capabilities abstract], but the code is still written in a #bold[monadic shape]:
-//   values are wrapped, sequencing goes through ```scala flatMap```, and the implementation is constrained by the chosen effect interface.
-// ]
+#feature-block("What changes after tagless final?")[
+  Tagless final keeps #bold[capabilities abstract], but the code is still written in a #bold[monadic shape]:
+  values are wrapped, sequencing goes through ```scala flatMap```, and the implementation is constrained by the chosen effect interface.
+]
 
-// #v(0.8em)
+#v(0.8em)
 
-// #warning-block("Direct-style promise")[
-//   Keep the required effects #bold[explicit in the type], but write the implementation in a style that looks much closer to ordinary imperative Scala.
-// ]
+#warning-block("Direct-style promise")[
+  Keep the required effects #bold[explicit in the type], but write the implementation in a style that looks much closer to ordinary imperative Scala.
+]
 
 // == Monadic vs Direct Style
 
