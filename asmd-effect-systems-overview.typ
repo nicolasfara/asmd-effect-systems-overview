@@ -6,6 +6,7 @@
 #import "@preview/codly:1.3.0": *
 #import "@preview/codly-languages:0.1.1": *
 #import "@preview/cetz:0.4.2"
+#import "@preview/tiaoma:0.3.0"
 #import "utils.typ": *
 
 #show: codly-init.with()
@@ -90,6 +91,26 @@
 
 // #components.adaptive-columns(outline(title: none, indent: 1em))
 
+== Companion Material
+
+#align(center)[
+  #tiaoma.barcode("https://github.com/nicolasfara/asmd-effect-systems-overview-code", "QRCode", options: (
+    scale: 5.0,
+    // fg-color: blue,
+    // bg-color: green.lighten(70%),
+    output-options: (
+    barcode-dotty-mode: false
+    ),
+    dot-size: 0.8,
+    )
+  )
+
+  #v(1em)
+
+  #set text(size: 1.3em, fill: rgb("#23373b"))
+
+  #fa-github() #h(0.5em) #link("https://github.com/nicolasfara/asmd-effect-systems-overview-code", `https://github.com/nicolasfara/asmd-effect-systems-overview-code`)
+]
 
 = It's All About Effects
 
