@@ -349,8 +349,19 @@ Hello, Nicolas!
         text(weight: "bold", fill: rgb("#e65100"))[Impure world],
       )
       content(
-        (0, 0),
+        (0, 0.5),
         text(weight: "bold", fill: rgb("#23373b"))[Pure world],
+      )
+      content(
+        (0, -0.5),
+        box(
+          inset: 0.5em,
+          radius: 999pt,
+          fill: white,
+          stroke: (paint: rgb("#23373b"), thickness: 0.8pt),
+        )[
+          #text(size: 0.95em, fill: rgb("#23373b"))[`flatMap`]
+        ]
       )
       content(
         (0, -2.35),
@@ -442,7 +453,7 @@ The way we defined our ```scala Parser``` is similar to a ```scala State``` mona
 
 ```scala
 final case class Parser[A](parse: String => Option[(A, String)])
-final case class State[S, A](run: S => (A, S))
+final case class State[S, A](run: S      =>        (A, S)      )
 ```
 
 We can express the parser as a combination of:
@@ -459,24 +470,27 @@ We want to #bold["stack"] these effects together in a modular way, allowing us t
   A monad transformer is a _type constructor_ that takes a monad as an argument and returns a new monad that combines the effects of both monads.
 ]
 
+#definition[
+  A monad stack is the _combined_ structure of multiple monads layered on top of each other to represent computations that involve multiple effects.
+]
+
 - Allows us to #underline[compose effects] in a modular way.
-- Avoids the #bold[boilerplate] of deeply nested monads.
 - Provides a #bold[unified interface] for working with multiple effects together.
 
 === Notable Monad Stacks
 - ```scala EitherT[M[_], E, A]```: combines an effect `M` with error handling.
 - ```scala StateT[M[_], S, A]```: combines an effect `M` with state manipulation.
-- ```scala ReaderT[M[_], R, A]```: combines an effect `M` with read-only environment access.
+// - ```scala ReaderT[M[_], R, A]```: combines an effect `M` with read-only environment access.
 - ```scala OptionT[M[_], A]```: combines an effect `M` with optional values.
 
-== Monad Transformers
+// == Monad Transformers
 
-Monad stacks are also called *monad transformers* because they allow us to "transform" one monad into another by adding additional effects on top of it.
+// Monad stacks are also called *monad transformers* because they allow us to "transform" one monad into another by adding additional effects on top of it.
 
-Given a base monad ```scala M[_]``` (e.g., ```scala IO```),
-and a #bold[transformer] ```scala T```, then ```scala T[M, A]``` (e.g., ```scala EitherT[IO, String, Int]```) is a new monad with ```scala M``` inside it.
+// Given a base monad ```scala M[_]``` (e.g., ```scala IO```),
+// and a #bold[transformer] ```scala T```, then ```scala T[M, A]``` (e.g., ```scala EitherT[IO, String, Int]```) is a new monad with ```scala M``` inside it.
 
-```scala StateT[String, OptionT[IO, _], A]``` is a state monad + option + IO, allowing us to manage state, handle optional values, and perform I/O operations all in one monad.
+// ```scala StateT[String, OptionT[IO, _], A]``` is a state monad + option + IO, allowing us to manage state, handle optional values, and perform I/O operations all in one monad.
 
 == Monad Transformer Definition
 
@@ -684,6 +698,210 @@ result match
 - Monad transformers #bold[tightly couple] code to specific effect modeling.
 - Ties logic to a specific implementation, severely #bold[hindering future changes].
 
+= Tagless Final Encoding
+
+// == Why Tagless Final?
+
+// #feature-block("What problem is left?")[
+//   *MTL* improves ergonomics, but our business logic can still end up coupled to *how* effects are implemented instead of just *which capabilities* it needs.
+// ]
+
+// - Domain code should depend on capabilities like ```scala UserStore```, not on a concrete transformer stack.
+// - If we replace the stack, we should not have to #bold[rewrite the program].
+// - The same logic should run against different interpreters: #bold[in memory] for tests, #bold[database + IO] in production.
+// - These capabilities are *application-specific algebras*, not only generic effects.
+
+// #warning-block("Tagless-final move")[
+//   Encode capabilities as interfaces over ```scala F[_]```, then provide the concrete interpreter later.
+// ]
+// 
+
+== Tagless Final Encoding
+
+#feature-block("Idea")[
+  Represent programs as *interfaces* (type classes) instead of concrete syntax trees, and interpret them by providing implementations.
+]
+
+=== Core pattern
+
+- Define *algebras* that describe the capabilities we need.
+- Write *programs* that depend on these algebras and on generic capabilities.
+- Provide *interpreters* that implement the algebras for specific effect types.
+
+#warning-block("It has nothing to do with monads")[
+  It is an *encoding style* to solve the "expression problem", not a monadic structure.
+]
+
+== The Core Idea with Monads
+
+#feature-block("The core idea")[
+  A tagless-final program is a #bold[polymorphic program]: it does not commit to a concrete effect type, only to the operations it requires.
+]
+
+```scala
+def program[F[_]](using /* required capabilities */): F[Result]
+```
+
+- ```scala F[_]``` is left abstract.
+- Type class constraints describe the #bold[capabilities] the program needs.
+- Concrete effect stacks appear only when we choose an #bold[interpreter].
+
+== Algebras Describe Capabilities
+
+#feature-block("Algebras describe capabilities")[
+  In tagless final, we package domain-specific effects as small interfaces, often called *algebras*.
+]
+
+```scala
+trait UserRepository[F[_]]:
+  def get(id: UUID): F[Option[User]]
+  def save(user: User): F[Unit]
+  def changeUserEmail(id: UUID, newEmail: String): F[Unit]
+```
+
+- This says nothing about #bold[how] users are stored.
+- It only states which *operations are available* for any effect ```scala F```.
+- The algebra belongs to the #bold[domain], not to a specific monad transformer stack.
+
+== Programs Stay Abstract
+
+#feature-block("Programs stay abstract")[
+  Business logic depends on the algebra and on generic capabilities such as ```scala Monad```.
+]
+
+```scala
+def signup[F[_]: Monad](name: String, email: String)(using
+    repo: UserRepository[F]
+): F[Unit] = for
+  id <- UUID.randomUUID().pure[F]
+  _ <- repo.save(User(id, name, email))
+yield ()
+```
+
+- The function signature tells us exactly *what the program needs*.
+- If the runtime #underline[changes], this function *stays the same*.
+
+== Interpreters Choose the Runtime
+
+#feature-block("Interpreters choose the runtime")[
+  The same tagless-final program can be interpreted in *different concrete* effect types.
+]
+
+```scala
+given UserRepository[ProductionRunner] = ???
+given UserRepository[InMemoryRunner] = ???
+
+val prod: ProductionRunner[Unit] =
+  signup[ProductionRunner]("Alice", "alice@example.com")
+val test: InMemoryRunner[Unit] =
+  signup[InMemoryRunner]("Bob", "bob@example.com")
+```
+
+The program is *reused*; only the interpreter #bold[changes].
+
+== Fixed Stack vs. Tagless Final
+
+#components.side-by-side(inset: 0.7em)[
+  #warning-block("Fixed stack style")[
+    - Chooses the full effect representation #bold[too early].
+    - #bold[Leaks implementation details] into business logic.
+    - Makes interpreter changes #bold[expensive].
+  ]
+][
+  #feature-block("Tagless-final style")[
+    - Abstracts over ```scala F[_]``` and *required capabilities*.
+    - Keeps domain logic *focused on operations*, not plumbing.
+    - Lets interpreters evolve *independently*.
+  ]
+]
+
+// == A Monadic Program
+
+// #feature-block("A monadic tagless-final program")[
+//   The real payoff appears when we sequence multiple effectful operations with a monad.
+// ]
+
+// ```scala
+// trait UserStore[F[_]]:
+//   def get(userId: UserId): F[Option[User]]
+//   def save(user: User): F[Unit]
+// ```
+
+// #pagebreak()
+
+// Then we can write our domain logic as a monadic program:
+
+// ```scala
+// type RaiseError[E] = [F[_]] =>> MonadError[F, E]
+
+// def renameUser[F[_]: Monad: RaiseError[String]](
+//     userId: UserId,
+//     newName: String
+// )(using store: UserStore): F[Unit] =
+//   for
+//     maybeUser <- store.get(userId)
+//     user <- maybeUser match
+//       case Some(user) => user.pure[F]
+//       case None => MonadError[F, String].raiseError("User not found")
+//     _ <- store.save(user.copy(name = newName))
+//   yield ()
+// ```
+
+// == In-Memory Interpreter
+
+// #feature-block("Interpreter 1: pure in-memory testing")[
+//   For tests we can use a small stateful interpreter with no real I/O.
+// ]
+
+// ```scala
+// type TestRunner[A] = State[Map[UserId, User], A]
+
+// given UserStore[TestRunner] with
+//   def get(userId: UserId): TestRunner[Option[User]] =
+//     State.inspect(_.get(userId))
+
+//   def save(user: User): TestRunner[Unit] =
+//     State.modify(_.updated(user.id, user))
+// ```
+
+// - Good for fast tests and deterministic behaviour.
+// - The program stays exactly the same: only the interpreter changes.
+
+// == Production Interpreter
+
+// #feature-block("Interpreter 2: effectful production")[
+//   In production we can interpret the same algebra with a monad that performs real effects.
+// ]
+
+// ```scala
+// type ProdRunner[A] = EitherT[IO, String, A]
+
+// given UserStore[ProdRunner] with
+//   def get(userId: UserId): ProdRunner[Option[User]] =
+//     EitherT.liftF(database.load(userId))
+
+//   def save(user: User): ProdRunner[Unit] = EitherT.liftF(database.update(user))
+
+// val result: ProdRunner[Unit] = renameUser[ProdRunner](userId, "Alice")
+// ```
+
+// == Monad and Tagless Final
+
+// #components.side-by-side(inset: 0.7em)[
+//   #feature-block("What the monad gives us")[
+//     - Sequencing with ```scala for```-comprehensions.
+//     - Access to generic combinators like ```scala pure``` and ```scala flatMap```.
+//     - A uniform way to compose domain operations.
+//   ]
+// ][
+//   #warning-block("What tagless final gives us")[
+//     - The program depends on capabilities, not implementations.
+//     - Interpreters can be swapped for testing or production.
+//     - Domain logic remains reusable as the runtime evolves.
+//   ]
+// ]
+
+
 = Monad Transformer Library (MTL)
 
 == What MTL Provides
@@ -753,676 +971,529 @@ def decrementState[F[_]](using
 We can provide our *effect definition* abstracting over the specific monad stack we will use in our application.
 
 ```scala
-trait UserStore[M[_]]:
-  def get(userId: UserId): M[Option[User]]
-  def save(user: User): M[Unit]
-  def delete(userId: UserId): M[Unit]
+trait EmailService[F[_]]:
+  def sendEmail(to: String, subject: String, body: String): F[Unit]
 ```
 
 And provide operations that use these effects to implement our domain logic:
 
 ```scala
-def updateOrDelete[M[_]: UserStore](user: User)(f: User => User | Delete): M[Unit]
+def signup[F[_]: Monad](name: Usename, email: Email)(using
+    repo: UserRepository[F],
+    emailService: EmailService[F],
+    raiseError: Raise[F, String],
+): F[Unit] = ...
 ```
 
-== Different Interpretations
-
-We can *interpret* the ```scala UserStore``` effect in different ways:
-- #bold[In memory] for testing purposes.
-- #bold[Using a database] for production.
-
-=== Production Setup
+#slide[
 ```scala
-final case class DatabaseConnection()
-final case class Runtime(connection: DatabaseConnection)
+object UserRepository:
+  type UserDb = Map[UUID, User]
 
-type ProductionRunner[A] = StateT[Runtime, IO, A]
+  given inMemoryRepository[F[_]: Monad](using
+      state: Stateful[F, UserDb]
+  ): UserRepository[F] with
+    def get(id: UUID): F[Option[User]] = state.get.map(_.get(id))
+    def save(user: User): F[Unit] = state.modify(_.updated(user.id, user))
+    def changeUserEmail(id: UUID, newEmail: String): F[Unit] =
+      state.modify: s =>
+        s.get(id) match
+          case Some(user) => s.updated(id, user.copy(email = newEmail))
+          case None => s // No change if user not found
 ```
-
-=== In-Memory Setup
-
-```scala
-final case class Runtime(users: Map[UserId, User])
-type InMemoryRunner[A] = State[Runtime, A]
-```
-
-= Tagless Final Encoding
-
-== Why Tagless Final?
-
-#feature-block("What problem is left?")[
-  *MTL* improves ergonomics, but our business logic can still end up coupled to *how* effects are implemented instead of just *which capabilities* it needs.
 ]
 
-- Domain code should depend on capabilities like ```scala UserStore```, not on a concrete transformer stack.
-- If we replace the stack, we should not have to #bold[rewrite the program].
-- The same logic should run against different interpreters: #bold[in memory] for tests, #bold[database + IO] in production.
-- These capabilities are *application-specific algebras*, not only generic effects.
+== Glue Together
 
-#warning-block("Tagless-final move")[
-  Encode capabilities as interfaces over ```scala F[_]```, then provide the concrete interpreter later.
-]
-
-== The Core Idea
-
-#feature-block("The core idea")[
-  A tagless-final program is a #bold[polymorphic program]: it does not commit to a concrete effect type, only to the operations it requires.
-]
+At the #bold[end of the world], we can choose a concrete monad stack that provides the required capabilities and run our program.
 
 ```scala
-def program[F[_]](/* required capabilities */): F[Result]
+  type Eff[A] = EitherT[[V] =>> StateT[IO, Map[UUID, User], V], String, A]
+
+  val initialUsers: Map[UUID, User] = Map.empty
+
+  def run: IO[Unit] = signup[Eff]("Alice", "alice@bar.com")
+    .value
+    .run(initialUsers)
+    .flatMap:
+      case (newState, Right(_)) =>
+        IO.println("User signed up successfully! New state: " + newState)
+      case (_, Left(error)) =>
+        IO.println(s"Error: $error")
 ```
 
-- ```scala F[_]``` is left abstract.
-- Type class constraints describe the #bold[capabilities] the program needs.
-- Concrete effect stacks appear only when we choose an #bold[interpreter].
-
-== Algebras Describe Capabilities
-
-#feature-block("Algebras describe capabilities")[
-  In tagless final, we package domain-specific effects as small interfaces, often called *algebras*.
-]
-
-```scala
-trait UserStore[F[_]]:
-  def get(userId: UserId): F[Option[User]]
-  def save(user: User): F[Unit]
-  def delete(userId: UserId): F[Unit]
-```
-
-- This says nothing about #bold[how] users are stored.
-- It only states which operations are available for any effect ```scala F```.
-- The algebra belongs to the #bold[domain], not to a specific monad transformer stack.
-
-== Programs Stay Abstract
-
-#feature-block("Programs stay abstract")[
-  Business logic depends on the algebra and on generic capabilities such as ```scala Monad```.
-]
-
-```scala
-def updateOrDelete[F[_]: Monad: UserStore](
-    user: User
-)(f: User => User | Delete): F[Unit] =
-  f(user) match
-    case updated: User => UserStore[F].save(updated)
-    case Delete => UserStore[F].delete(user.id)
-```
-
-- The function signature tells us exactly what the program needs.
-- No concrete ```scala EitherT[StateT[...], ...]``` appears in the domain logic.
-- If the runtime changes, this function stays the same.
-
-== Interpreters Choose the Runtime
-
-#feature-block("Interpreters choose the runtime")[
-  The same tagless-final program can be interpreted in different concrete effect types.
-]
-
-```scala
-given UserStore[ProductionRunner] = ???
-given UserStore[InMemoryRunner] = ???
-
-val prod: ProductionRunner[Unit] =
-  updateOrDelete[ProductionRunner](user)(f)
-
-val test: InMemoryRunner[Unit] =
-  updateOrDelete[InMemoryRunner](user)(f)
-```
-
-The program is *reused*; only the interpreter #bold[changes].
-
-== Fixed Stack vs. Tagless Final
-
-#components.side-by-side(inset: 0.7em)[
-  #warning-block("Fixed stack style")[
-    - Chooses the full effect representation too early.
-    - Leaks implementation details into business logic.
-    - Makes interpreter changes expensive.
-  ]
-][
-  #feature-block("Tagless-final style")[
-    - Abstracts over ```scala F[_]``` and required capabilities.
-    - Keeps domain logic focused on operations, not plumbing.
-    - Lets interpreters evolve independently.
-  ]
-]
-
-== A Monadic Program
-
-#feature-block("A monadic tagless-final program")[
-  The real payoff appears when we sequence multiple effectful operations with a monad.
-]
-
-```scala
-trait UserStore[F[_]]:
-  def get(userId: UserId): F[Option[User]]
-  def save(user: User): F[Unit]
-```
-
-#pagebreak()
-
-Then we can write our domain logic as a monadic program:
-
-```scala
-def renameUser[F[_]: Monad: UserStore](
-    userId: UserId,
-    newName: String
-)(using MonadError[F, String]): F[Unit] =
-  for
-    maybeUser <- summon[UserStore[F]].get(userId)
-    user <- maybeUser match
-      case Some(user) => user.pure[F]
-      case None => summon[MonadError[F, String]].raiseError("User not found")
-    _ <- summon[UserStore[F]].save(user.copy(name = newName))
-  yield ()
-```
+// == Different Interpretations
 
-== In-Memory Interpreter
+// We can *interpret* the ```scala UserStore``` effect in different ways:
+// - #bold[In memory] for testing purposes.
+// - #bold[Using a database] for production.
 
-#feature-block("Interpreter 1: pure in-memory testing")[
-  For tests we can use a small stateful interpreter with no real I/O.
-]
+// === Production Setup
+// ```scala
+// final case class DatabaseConnection()
+// final case class Runtime(connection: DatabaseConnection)
 
-```scala
-type TestRunner[A] = State[Map[UserId, User], A]
-
-given UserStore[TestRunner] with
-  def get(userId: UserId): TestRunner[Option[User]] =
-    State.inspect(_.get(userId))
-
-  def save(user: User): TestRunner[Unit] =
-    State.modify(_.updated(user.id, user))
-```
-
-- Good for fast tests and deterministic behaviour.
-- The program stays exactly the same: only the interpreter changes.
-
-== Production Interpreter
-
-#feature-block("Interpreter 2: effectful production")[
-  In production we can interpret the same algebra with a monad that performs real effects.
-]
-
-```scala
-type ProdRunner[A] = EitherT[IO, String, A]
-
-given UserStore[ProdRunner] with
-  def get(userId: UserId): ProdRunner[Option[User]] =
-    EitherT.liftF(database.load(userId))
-
-  def save(user: User): ProdRunner[Unit] = EitherT.liftF(database.update(user))
+// type ProductionRunner[A] = StateT[Runtime, IO, A]
+// ```
 
-val result: ProdRunner[Unit] = renameUser[ProdRunner](userId, "Alice")
-```
+// === In-Memory Setup
 
-== Monad and Tagless Final
+// ```scala
+// final case class Runtime(users: Map[UserId, User])
+// type InMemoryRunner[A] = State[Runtime, A]
+// ```
 
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("What the monad gives us")[
-    - Sequencing with ```scala for```-comprehensions.
-    - Access to generic combinators like ```scala pure``` and ```scala flatMap```.
-    - A uniform way to compose domain operations.
-  ]
-][
-  #warning-block("What tagless final gives us")[
-    - The program depends on capabilities, not implementations.
-    - Interpreters can be swapped for testing or production.
-    - Domain logic remains reusable as the runtime evolves.
-  ]
-]
+// = Direct Style with Capabilities
 
-= Direct Style with Capabilities
+// == Why Another Style?
 
-== Why Another Style?
+// #feature-block("What changes after tagless final?")[
+//   Tagless final keeps #bold[capabilities abstract], but the code is still written in a #bold[monadic shape]:
+//   values are wrapped, sequencing goes through ```scala flatMap```, and the implementation is constrained by the chosen effect interface.
+// ]
 
-#feature-block("What changes after tagless final?")[
-  Tagless final keeps #bold[capabilities abstract], but the code is still written in a #bold[monadic shape]:
-  values are wrapped, sequencing goes through ```scala flatMap```, and the implementation is constrained by the chosen effect interface.
-]
+// #v(0.8em)
 
-#v(0.8em)
+// #warning-block("Direct-style promise")[
+//   Keep the required effects #bold[explicit in the type], but write the implementation in a style that looks much closer to ordinary imperative Scala.
+// ]
 
-#warning-block("Direct-style promise")[
-  Keep the required effects #bold[explicit in the type], but write the implementation in a style that looks much closer to ordinary imperative Scala.
-]
-
-== Monadic vs Direct Style
+// == Monadic vs Direct Style
 
-We can encode effects as capabilities, but still write our code in a monadic style:
+// We can encode effects as capabilities, but still write our code in a monadic style:
 
-```scala
-def op[F[_]: MonadThrow](id: Int)(using C: Config[F], L: Logger[F]): F[Result] = for
-  config <- C.config
-  _ <- L.info(s"Processing $id")
-  result <- if id < 0 then
-    InvalidIdError.raiseError[F, Result]
-  else
-    compute(config, id).pure[F]
-yield result
-```
+// ```scala
+// def op[F[_]: MonadThrow](id: Int)(using C: Config[F], L: Logger[F]): F[Result] = for
+//   config <- C.config
+//   _ <- L.info(s"Processing $id")
+//   result <- if id < 0 then
+//     InvalidIdError.raiseError[F, Result]
+//   else
+//     compute(config, id).pure[F]
+// yield result
+// ```
 
-#pagebreak()
+// #pagebreak()
 
-We can rewrite this in *direct style*, using the capabilities directly without monadic wrapping:
+// We can rewrite this in *direct style*, using the capabilities directly without monadic wrapping:
 
-```scala
-def op(id: Int): (Config, Logger) ?=> Either[Error, Result] =
-  val config = Config.config
-  Logger.info(s"Processing $id")
-  if id < 0 then Left(InvalidIdError)
-  else Right(compute(config, id))
-```
+// ```scala
+// def op(id: Int): (Config, Logger) ?=> Either[Error, Result] =
+//   val config = Config.config
+//   Logger.info(s"Processing $id")
+//   if id < 0 then Left(InvalidIdError)
+//   else Right(compute(config, id))
+// ```
 
-This #bold[reduces the boilerplate] and makes the code look more like ordinary Scala, while still keeping the effects *explicit* in the type signature.
+// This #bold[reduces the boilerplate] and makes the code look more like ordinary Scala, while still keeping the effects *explicit* in the type signature.
 
-== Trade-offs
+// == Trade-offs
 
-#components.side-by-side(inset: 0.7em)[
-  === Direct style
-    - Easier local reasoning.
-    - Less boilerplate in the implementation.
-    - Reads like ordinary step-by-step code.
-    - Higher-order safety is more delicate.
-][
-  === Monadic style
-    - Composition story is very strong.
-    - Ecosystem and libraries are mature.
-    - More explicit sequencing discipline.
-    - Code can become harder to read when stacks grow.
-]
+// #components.side-by-side(inset: 0.7em)[
+//   === Direct style
+//     - Easier local reasoning.
+//     - Less boilerplate in the implementation.
+//     - Reads like ordinary step-by-step code.
+//     - Higher-order safety is more delicate.
+// ][
+//   === Monadic style
+//     - Composition story is very strong.
+//     - Ecosystem and libraries are mature.
+//     - More explicit sequencing discipline.
+//     - Code can become harder to read when stacks grow.
+// ]
 
-#focus-slide[
-  #text(size: 1.35em)[Shift from *effects as results* to *effects as capabilities*.]
-]
+// #focus-slide[
+//   #text(size: 1.35em)[Shift from *effects as results* to *effects as capabilities*.]
+// ]
 
-== How to Encode Capabilities?
+// == How to Encode Capabilities?
 
-We can leverage *Contextual Abstractions* to encode capabilities directly in the type system, without needing to wrap values in monads.
+// We can leverage *Contextual Abstractions* to encode capabilities directly in the type system, without needing to wrap values in monads.
 
-```scala
-trait IO:
-  def write(content: String)(using CanFail): Unit
-  def read[T](f: Iterator[String] => T)(using CanFail): T
+// ```scala
+// trait IO:
+//   def write(content: String)(using CanFail): Unit
+//   def read[T](f: Iterator[String] => T)(using CanFail): T
 
-object IO:
-  def write(content: String)(using IO, CanFail): Unit = summon[IO].write(content)
-  def read[T](f: Iterator[String] => T)(using IO, CanFail): T = summon[IO].read(f)
-```
+// object IO:
+//   def write(content: String)(using IO, CanFail): Unit = summon[IO].write(content)
+//   def read[T](f: Iterator[String] => T)(using IO, CanFail): T = summon[IO].read(f)
+// ```
 
-We inverted the control flow: instead of returning an effect type, we require the capability to perform the effect as a context parameter.
+// We inverted the control flow: instead of returning an effect type, we require the capability to perform the effect as a context parameter.
 
-== How to use the capabilities?
+// == How to use the capabilities?
 
-To use the capabilities, we simply need to provide them as context parameters in our function signatures.
+// To use the capabilities, we simply need to provide them as context parameters in our function signatures.
 
-```scala
-def processFile(path: String)(using IO, CanFail): Unit =
-  val content = IO.read: lines =>
-    lines.mkString("\n")
-  IO.write(s"File content:\n$content")
-```
+// ```scala
+// def processFile(path: String)(using IO, CanFail): Unit =
+//   val content = IO.read: lines =>
+//     lines.mkString("\n")
+//   IO.write(s"File content:\n$content")
+// ```
 
-To execute this code, we need to provide an implementation of the `IO` capability and a way to handle failures:
+// To execute this code, we need to provide an implementation of the `IO` capability and a way to handle failures:
 
-```scala
-def handle[A](program: IO ?=> A): A = ???
+// ```scala
+// def handle[A](program: IO ?=> A): A = ???
 
-@main def run(): Unit = IO.handle:
-  try processFile("data.txt")
-  catch case _: Exception => println("An error occurred")
-```
+// @main def run(): Unit = IO.handle:
+//   try processFile("data.txt")
+//   catch case _: Exception => println("An error occurred")
+// ```
 
-== Why Exceptions Still Matter
+// == Why Exceptions Still Matter
 
-#feature-block("Why people keep using exceptions")[
-  - Minimal boilerplate on the happy path.
-  - Natural propagation of failures.
-  - Debug-friendly stack traces.
-]
+// #feature-block("Why people keep using exceptions")[
+//   - Minimal boilerplate on the happy path.
+//   - Natural propagation of failures.
+//   - Debug-friendly stack traces.
+// ]
 
-```scala
-def readFile(path: String): String =
-  val source = Source.fromFile(path)
-  try source.getLines().mkString("\n")
-  finally source.close()
-```
+// ```scala
+// def readFile(path: String): String =
+//   val source = Source.fromFile(path)
+//   try source.getLines().mkString("\n")
+//   finally source.close()
+// ```
 
-== Checked Exceptions and Either
+// == Checked Exceptions and Either
 
-#warning-block("Java checked exceptions")[
-  In principle they make failures part of the contract, but they compose badly with higher-order APIs.
+// #warning-block("Java checked exceptions")[
+//   In principle they make failures part of the contract, but they compose badly with higher-order APIs.
 
-  ```scala
-  xs.map(x => if x < limit then x * x else throw LimitExceeded())
-  ```
+//   ```scala
+//   xs.map(x => if x < limit then x * x else throw LimitExceeded())
+//   ```
 
-  The callback is not allowed to throw a checked exception.
-]
+//   The callback is not allowed to throw a checked exception.
+// ]
 
-#pagebreak()
+// #pagebreak()
 
-#feature-block([```scala Either```])[
-  ```scala
-  def readFile(path: String): Either[IOException, String]
-  ```
+// #feature-block([```scala Either```])[
+//   ```scala
+//   def readFile(path: String): Either[IOException, String]
+//   ```
 
-  - Restores static typing.
-  - Adds plumbing to the happy path.
-  - Reintroduces the classic problem of composing with other effects.
-]
+//   - Restores static typing.
+//   - Adds plumbing to the happy path.
+//   - Reintroduces the classic problem of composing with other effects.
+// ]
 
-== Effects as Capabilities
+// == Effects as Capabilities
 
-#feature-block("The key idea")[
-  Instead of saying “this computation #bold[produces] an effect”, say “this code #bold[requires] the capability to perform that effect”.
-]
+// #feature-block("The key idea")[
+//   Instead of saying “this computation #bold[produces] an effect”, say “this code #bold[requires] the capability to perform that effect”.
+// ]
 
-```scala
-erased class CanThrow[-E <: Exception]
+// ```scala
+// erased class CanThrow[-E <: Exception]
 
-infix type throws[R, -E <: Exception] = CanThrow[E] ?=> R
-```
+// infix type throws[R, -E <: Exception] = CanThrow[E] ?=> R
+// ```
 
-- `CanThrow[E]` is the capability.
-- `R throws E` is just a more readable surface notation.
+// - `CanThrow[E]` is the capability.
+// - `R throws E` is just a more readable surface notation.
 
-== `throws` Is Just Syntax
+// == `throws` Is Just Syntax
 
-```scala
-def f(x: Double): Double throws LimitExceeded =
-  if x < limit then x * x else throw LimitExceeded()
+// ```scala
+// def f(x: Double): Double throws LimitExceeded =
+//   if x < limit then x * x else throw LimitExceeded()
 
-def g(x: Double)(using CanThrow[LimitExceeded]): Double =
-  if x < limit then x * x else throw LimitExceeded()
-```
+// def g(x: Double)(using CanThrow[LimitExceeded]): Double =
+//   if x < limit then x * x else throw LimitExceeded()
+// ```
 
-#note-block("Same meaning")[
-  The two signatures describe the same requirement:
-  the function needs the capability to throw `LimitExceeded`.
-]
+// #note-block("Same meaning")[
+//   The two signatures describe the same requirement:
+//   the function needs the capability to throw `LimitExceeded`.
+// ]
 
-== LimitExceeded Example
+// == LimitExceeded Example
 
-```scala
-val limit = 10e9
-class LimitExceeded extends Exception
+// ```scala
+// val limit = 10e9
+// class LimitExceeded extends Exception
 
-def unsafeSquare(x: Double): Double =
-  if x < limit then x * x
-  else throw LimitExceeded()
-```
+// def unsafeSquare(x: Double): Double =
+//   if x < limit then x * x
+//   else throw LimitExceeded()
+// ```
 
-#warning-block("Compile-time feedback")[
-  This definition is rejected because the body throws `LimitExceeded`,
-  but the signature does not provide a `CanThrow[LimitExceeded]` capability.
-]
+// #warning-block("Compile-time feedback")[
+//   This definition is rejected because the body throws `LimitExceeded`,
+//   but the signature does not provide a `CanThrow[LimitExceeded]` capability.
+// ]
 
-== Where Does the Capability Come From?
+// == Where Does the Capability Come From?
 
-```scala
-def safeSquare(x: Double): Double throws LimitExceeded =
-  if x < limit then x * x
-  else throw LimitExceeded()
+// ```scala
+// def safeSquare(x: Double): Double throws LimitExceeded =
+//   if x < limit then x * x
+//   else throw LimitExceeded()
 
-@main def test(xs: Double*) =
-  try println(xs.map(safeSquare).sum)
-  catch case _: LimitExceeded => println("too large")
-```
+// @main def test(xs: Double*) =
+//   try println(xs.map(safeSquare).sum)
+//   catch case _: LimitExceeded => println("too large")
+// ```
 
-#feature-block("Scoped capability")[
-  The `try/catch` block is the place where the compiler can introduce the temporary capability required by `safeSquare`.
-]
-
-== Higher-Order Caveat
-
-```scala
-def escaped(xs: Double*): () => Double =
-  try () => xs.map(safeSquare).sum
-  catch case _: LimitExceeded => () => -1.0
-```
-
-#warning-block("Problem")[
-  The closure returned by `escaped` can outlive the `try/catch` block.
-  If it still depends on the throwing capability, the effect has #bold[escaped its scope].
-]
-
-#v(0.4em)
-
-We need a way to track that these capabilities are #bold[ephemeral].
-
-== Capture Checking
-
-#feature-block("Capture checking in Scala 3")[
-  Capture checking tracks which values and closures depend on which capabilities, so that capabilities cannot silently escape the region where they are valid.
-]
-
-```scala
-import language.experimental.captureChecking
-```
-
-- It is the missing ingredient for #bold[sound direct-style effects].
-- It is especially useful for resources, handlers, continuations, and scoped I/O.
-
-== Motivating Example
-
-```scala
-def usingLogFile[T](op: FileOutputStream => T): T =
-  val logFile = FileOutputStream("log")
-  val result = op(logFile)
-  logFile.close()
-  result
-
-val later = usingLogFile { file => (x: Int) => file.write(x) }
-later(10) // crash
-```
-
-#warning-block("Bug")[
-  The returned closure captures `file`, but the file is already closed when the closure runs.
-]
-
-== Make the File a Capability
-
-```scala
-def usingLogFile[T](op: FileOutputStream^ => T): T =
-  val logFile = FileOutputStream("log")
-  val result = op(logFile)
-  logFile.close()
-  result
-```
-
-#feature-block([What ```scala ^``` means])[
-  `FileOutputStream^` is now a #bold[capability value]:
-  the compiler tracks its lifetime and verifies that results do not carry it outside its valid scope.
-]
-
-== Why the Closure Is Rejected
-
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("Core intuition")[
-    - `^` marks a value whose authority matters.
-    - The closure type mentions the captured file capability.
-    - The result type of `usingLogFile` cannot mention a local capability that is no longer in scope.
-  ]
-][
-  #warning-block("What the compiler prevents")[
-    ```scala
-    val later =
-      usingLogFile { f => () => f.write(0) }
-    ```
-
-    The returned function would need to carry `f`,
-    but `f` disappears at the end of `usingLogFile`.
-  ]
-]
-
-== Eager vs Lazy Matters
-
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("Safe: eager evaluation")[
-    ```scala
-    val xs = usingLogFile: f =>
-      List(1, 2, 3).map: x =>
-        f.write(x)
-        x * x
-    ```
-
-    The writes happen immediately, while `f` is still valid.
-  ]
-][
-  #warning-block("Unsafe: delayed evaluation")[
-    ```scala
-    val xs = usingLogFile: f =>
-      LazyList(1, 2, 3).map: x =>
-        f.write(x)
-        x * x
-    ```
-
-    The work is delayed, so the file capability may be used too late.
-  ]
-]
-
-== Minimal Notation
-
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("Capabilities and function values")[
-    - `T^`: a capability of type `T`.
-    - `A => B`: an impure function that may capture arbitrary capabilities.
-    - `A -> B`: a pure function that captures none.
-  ]
-][
-  #warning-block("Context functions")[
-    - `A ?=> B`: an impure context function.
-    - `A ?-> B`: a pure context function.
-    - Capture checking makes these differences #bold[statically meaningful].
-  ]
-]
-
-== Direct-Style IO
-
-```scala
-trait IO:
-  def println(content: String): Unit
-  def read[R](combine: IterableOnce[String] => R): R
-
-type EffectIO[R] = IO ?=> R
-```
-
-#feature-block("Reading the signature")[
-  A program of type `EffectIO[R]` needs an `IO` capability in scope and then returns an `R`.
-]
-
-== Unsafe Handler Escape
-
-```scala
-def unsafeReadFile: EffectIO[IterableOnce[String]] =
-  IO.read(identity)
-
-def main() =
-  val res = IO.runWithHandler(doubleItAndPrint(5))(using
-    fileHandler(Path.of("input.txt"))
-  )
-  println(res)
-```
-
-#warning-block("Runtime failure")[
-  If `read` returns a value still tied to the handler, that value can outlive the handler and fail later with errors like `Stream Closed`.
-]
-
-== Capture-Aware IO
-
-```scala
-trait IO:
-  def println(content: String): Unit
-  def read[R](combine: IterableOnce[String]^ => R): R
-
-object IO:
-  def run[R](program: EffectIO[R])(using io: IO): R^{program} =
-    program(using io)
-```
-
-#feature-block("Safer encoding")[
-  The callback explicitly receives a capability.
-  Now the result type can record whether it depends on the surrounding program capability.
-]
-
-== Why This Helps
-
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("What becomes legal")[
-    - Using the handler inside the callback.
-    - Producing a result that does #bold[not] retain the handler.
-    - Writing direct-style programs over `IO ?=> R`.
-  ]
-][
-  #warning-block("What becomes illegal")[
-    - Returning a value that still captures the file/stream handler.
-    - Smuggling scoped authority into delayed code.
-    - Turning a local capability into a global one.
-  ]
-]
-
-#focus-slide[
-  #text(size: 1.3em)[Direct style is pleasant, but #bold[soundness for scoped effects] requires #bold[capture checking].]
-]
-
-== Separation Checking
-
-#feature-block("A different problem")[
-  Capture checking controls #bold[lifetime and escape].
-  Separation checking controls #bold[aliasing] when mutable capabilities are involved.
-]
-
-- Capture checking asks: “can this capability outlive its scope?”
-- Separation checking asks: “can two references alias the same mutable authority?”
-
-== Mutable Capabilities
-
-```scala
-trait Mutable extends ExclusiveCapability
-
-class Matrix(nrows: Int, ncols: Int) extends Mutable:
-  update def setElem(i: Int, j: Int, x: Double): Unit = ???
-  def getElem(i: Int, j: Int): Double = ???
-```
-
-#note-block("Minimal surface")[
-  - `update` marks methods with mutation effects.
-  - `Matrix^` denotes exclusive write authority.
-  - Plain `Matrix` references are treated as read-only in this context.
-]
-
-== Matrix Multiplication
-
-```scala
-def multiply(a: Matrix, b: Matrix, c: Matrix^): Unit =
-  ???
-```
-
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("What this tells us")[
-    - `a` and `b` are used read-only.
-    - `c` is the mutable output position.
-  ]
-][
-  #warning-block("What is guaranteed")[
-    - `multiply` cannot update `a` or `b`.
-    - `c` must be distinct from `a` and `b`, preventing accidental aliasing.
-  ]
-]
-
-== Takeaways
-
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("Three encodings of effects")[
-    - Monads encode effects in #bold[values].
-    - Direct style encodes effects as #bold[capabilities].
-    - Capture checking makes those capabilities #bold[scoped and safe].
-  ]
-][
-  #warning-block("Why the ending matters")[
-    - Direct style improves readability.
-    - Capture checking prevents capability escape.
-    - Separation checking prevents unsafe aliasing of mutable authority.
-  ]
-]
+// #feature-block("Scoped capability")[
+//   The `try/catch` block is the place where the compiler can introduce the temporary capability required by `safeSquare`.
+// ]
+
+// == Higher-Order Caveat
+
+// ```scala
+// def escaped(xs: Double*): () => Double =
+//   try () => xs.map(safeSquare).sum
+//   catch case _: LimitExceeded => () => -1.0
+// ```
+
+// #warning-block("Problem")[
+//   The closure returned by `escaped` can outlive the `try/catch` block.
+//   If it still depends on the throwing capability, the effect has #bold[escaped its scope].
+// ]
+
+// #v(0.4em)
+
+// We need a way to track that these capabilities are #bold[ephemeral].
+
+// == Capture Checking
+
+// #feature-block("Capture checking in Scala 3")[
+//   Capture checking tracks which values and closures depend on which capabilities, so that capabilities cannot silently escape the region where they are valid.
+// ]
+
+// ```scala
+// import language.experimental.captureChecking
+// ```
+
+// - It is the missing ingredient for #bold[sound direct-style effects].
+// - It is especially useful for resources, handlers, continuations, and scoped I/O.
+
+// == Motivating Example
+
+// ```scala
+// def usingLogFile[T](op: FileOutputStream => T): T =
+//   val logFile = FileOutputStream("log")
+//   val result = op(logFile)
+//   logFile.close()
+//   result
+
+// val later = usingLogFile { file => (x: Int) => file.write(x) }
+// later(10) // crash
+// ```
+
+// #warning-block("Bug")[
+//   The returned closure captures `file`, but the file is already closed when the closure runs.
+// ]
+
+// == Make the File a Capability
+
+// ```scala
+// def usingLogFile[T](op: FileOutputStream^ => T): T =
+//   val logFile = FileOutputStream("log")
+//   val result = op(logFile)
+//   logFile.close()
+//   result
+// ```
+
+// #feature-block([What ```scala ^``` means])[
+//   `FileOutputStream^` is now a #bold[capability value]:
+//   the compiler tracks its lifetime and verifies that results do not carry it outside its valid scope.
+// ]
+
+// == Why the Closure Is Rejected
+
+// #components.side-by-side(inset: 0.7em)[
+//   #feature-block("Core intuition")[
+//     - `^` marks a value whose authority matters.
+//     - The closure type mentions the captured file capability.
+//     - The result type of `usingLogFile` cannot mention a local capability that is no longer in scope.
+//   ]
+// ][
+//   #warning-block("What the compiler prevents")[
+//     ```scala
+//     val later =
+//       usingLogFile { f => () => f.write(0) }
+//     ```
+
+//     The returned function would need to carry `f`,
+//     but `f` disappears at the end of `usingLogFile`.
+//   ]
+// ]
+
+// == Eager vs Lazy Matters
+
+// #components.side-by-side(inset: 0.7em)[
+//   #feature-block("Safe: eager evaluation")[
+//     ```scala
+//     val xs = usingLogFile: f =>
+//       List(1, 2, 3).map: x =>
+//         f.write(x)
+//         x * x
+//     ```
+
+//     The writes happen immediately, while `f` is still valid.
+//   ]
+// ][
+//   #warning-block("Unsafe: delayed evaluation")[
+//     ```scala
+//     val xs = usingLogFile: f =>
+//       LazyList(1, 2, 3).map: x =>
+//         f.write(x)
+//         x * x
+//     ```
+
+//     The work is delayed, so the file capability may be used too late.
+//   ]
+// ]
+
+// == Minimal Notation
+
+// #components.side-by-side(inset: 0.7em)[
+//   #feature-block("Capabilities and function values")[
+//     - `T^`: a capability of type `T`.
+//     - `A => B`: an impure function that may capture arbitrary capabilities.
+//     - `A -> B`: a pure function that captures none.
+//   ]
+// ][
+//   #warning-block("Context functions")[
+//     - `A ?=> B`: an impure context function.
+//     - `A ?-> B`: a pure context function.
+//     - Capture checking makes these differences #bold[statically meaningful].
+//   ]
+// ]
+
+// == Direct-Style IO
+
+// ```scala
+// trait IO:
+//   def println(content: String): Unit
+//   def read[R](combine: IterableOnce[String] => R): R
+
+// type EffectIO[R] = IO ?=> R
+// ```
+
+// #feature-block("Reading the signature")[
+//   A program of type `EffectIO[R]` needs an `IO` capability in scope and then returns an `R`.
+// ]
+
+// == Unsafe Handler Escape
+
+// ```scala
+// def unsafeReadFile: EffectIO[IterableOnce[String]] =
+//   IO.read(identity)
+
+// def main() =
+//   val res = IO.runWithHandler(doubleItAndPrint(5))(using
+//     fileHandler(Path.of("input.txt"))
+//   )
+//   println(res)
+// ```
+
+// #warning-block("Runtime failure")[
+//   If `read` returns a value still tied to the handler, that value can outlive the handler and fail later with errors like `Stream Closed`.
+// ]
+
+// == Capture-Aware IO
+
+// ```scala
+// trait IO:
+//   def println(content: String): Unit
+//   def read[R](combine: IterableOnce[String]^ => R): R
+
+// object IO:
+//   def run[R](program: EffectIO[R])(using io: IO): R^{program} =
+//     program(using io)
+// ```
+
+// #feature-block("Safer encoding")[
+//   The callback explicitly receives a capability.
+//   Now the result type can record whether it depends on the surrounding program capability.
+// ]
+
+// == Why This Helps
+
+// #components.side-by-side(inset: 0.7em)[
+//   #feature-block("What becomes legal")[
+//     - Using the handler inside the callback.
+//     - Producing a result that does #bold[not] retain the handler.
+//     - Writing direct-style programs over `IO ?=> R`.
+//   ]
+// ][
+//   #warning-block("What becomes illegal")[
+//     - Returning a value that still captures the file/stream handler.
+//     - Smuggling scoped authority into delayed code.
+//     - Turning a local capability into a global one.
+//   ]
+// ]
+
+// #focus-slide[
+//   #text(size: 1.3em)[Direct style is pleasant, but #bold[soundness for scoped effects] requires #bold[capture checking].]
+// ]
+
+// == Separation Checking
+
+// #feature-block("A different problem")[
+//   Capture checking controls #bold[lifetime and escape].
+//   Separation checking controls #bold[aliasing] when mutable capabilities are involved.
+// ]
+
+// - Capture checking asks: “can this capability outlive its scope?”
+// - Separation checking asks: “can two references alias the same mutable authority?”
+
+// == Mutable Capabilities
+
+// ```scala
+// trait Mutable extends ExclusiveCapability
+
+// class Matrix(nrows: Int, ncols: Int) extends Mutable:
+//   update def setElem(i: Int, j: Int, x: Double): Unit = ???
+//   def getElem(i: Int, j: Int): Double = ???
+// ```
+
+// #note-block("Minimal surface")[
+//   - `update` marks methods with mutation effects.
+//   - `Matrix^` denotes exclusive write authority.
+//   - Plain `Matrix` references are treated as read-only in this context.
+// ]
+
+// == Matrix Multiplication
+
+// ```scala
+// def multiply(a: Matrix, b: Matrix, c: Matrix^): Unit =
+//   ???
+// ```
+
+// #components.side-by-side(inset: 0.7em)[
+//   #feature-block("What this tells us")[
+//     - `a` and `b` are used read-only.
+//     - `c` is the mutable output position.
+//   ]
+// ][
+//   #warning-block("What is guaranteed")[
+//     - `multiply` cannot update `a` or `b`.
+//     - `c` must be distinct from `a` and `b`, preventing accidental aliasing.
+//   ]
+// ]
+
+// == Takeaways
+
+// #components.side-by-side(inset: 0.7em)[
+//   #feature-block("Three encodings of effects")[
+//     - Monads encode effects in #bold[values].
+//     - Direct style encodes effects as #bold[capabilities].
+//     - Capture checking makes those capabilities #bold[scoped and safe].
+//   ]
+// ][
+//   #warning-block("Why the ending matters")[
+//     - Direct style improves readability.
+//     - Capture checking prevents capability escape.
+//     - Separation checking prevents unsafe aliasing of mutable authority.
+//   ]
+// ]
