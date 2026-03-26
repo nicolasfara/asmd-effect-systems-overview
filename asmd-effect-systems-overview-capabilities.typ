@@ -118,19 +118,19 @@
 == Why Another Style?
 
 #feature-block("What changes after tagless final?")[
-  Tagless final keeps #bold[capabilities abstract], but the code is still written in a #bold[monadic shape]:
-  values are wrapped, sequencing goes through ```scala flatMap```, and the implementation is constrained by the chosen effect interface.
+  Tagless final keeps #bold[capabilities abstract], but the code still tends to be written in a #bold[monadic shape]:
+  results stay wrapped, sequencing goes through ```scala flatMap```, and the business logic is structured around the chosen effect interface.
 ]
 
 #v(0.8em)
 
 #warning-block("Direct-style promise")[
-  Keep the required effects #bold[explicit in the type], but write the implementation in a style that looks much closer to ordinary imperative Scala.
+  Keep the required effects #bold[explicit in the type], but write the implementation in a style that looks much closer to ordinary Scala.
 ]
 
 == Monadic vs Direct Style
 
-We can encode effects as capabilities, but still write our code in a monadic style:
+We can encode effects as capabilities, but still write in a monadic style:
 
 ```scala
 def op[F[_]: MonadThrow](id: Int)(using C: Config[F], L: Logger[F]): F[Result] = for
@@ -145,7 +145,7 @@ yield result
 
 #pagebreak()
 
-We can rewrite this in *direct style*, using the capabilities directly without monadic wrapping:
+The same requirements can be used in *direct style*:
 
 ```scala
 def op(id: Int): (Config, Logger) ?=> Either[Error, Result] =
@@ -155,7 +155,7 @@ def op(id: Int): (Config, Logger) ?=> Either[Error, Result] =
   else Right(compute(config, id))
 ```
 
-This #bold[reduces the boilerplate] and makes the code look more like ordinary Scala, while still keeping the effects *explicit* in the type signature.
+This keeps the effects visible in the signature, while making the implementation read like step-by-step code.
 
 == Trade-offs
 
@@ -172,7 +172,7 @@ This #bold[reduces the boilerplate] and makes the code look more like ordinary S
 
       - Easier #bold[local reasoning].
       - Less implementation #bold[boilerplate].
-      - Reads like step-by-step code.
+      - Reads like business logic.
       - Higher-order safety is more *delicate*.
     ],
     fill-color: rgb("#fff8f1"),
@@ -194,7 +194,7 @@ This #bold[reduces the boilerplate] and makes the code look more like ordinary S
 
       - Very strong #bold[composition story].
       - #bold[Mature] ecosystem and libraries.
-      - More #bold[explicit sequencing]discipline.
+      - Explicit sequencing discipline.
       - Large stacks can become *harder to read*.
     ],
     fill-color: rgb("#f5f9fa"),
@@ -211,86 +211,104 @@ This #bold[reduces the boilerplate] and makes the code look more like ordinary S
 
 == How to Encode Capabilities?
 
-We can leverage *Contextual Abstractions* to encode capabilities directly in the type system, without needing to wrap values in monads.
+We can leverage contextual abstractions to encode effects directly in the type system, without wrapping values in monads.
 
 ```scala
 trait IO:
-  def write(content: String)(using CanFail): Unit
-  def read[T](f: Iterator[String] => T)(using CanFail): T
+  def write(content: String): Unit
+  def read[T](f: Iterator[String] => T): T
 
 object IO:
-  def write(content: String)(using io: IO, fail: CanFail): Unit =
+  def write(content: String)(using io: IO): Unit =
     io.write(content)
-  def read[T](f: Iterator[String] => T)(using io: IO, fail: CanFail): T =
+  def read[T](f: Iterator[String] => T)(using io: IO): T =
     io.read(f)
 ```
 
-We inverted the control flow: instead of returning an effect type, we require the capability to perform the effect as a context parameter.
+Instead of returning an effect value, we require the capability that authorizes the effect.
 
-== How to use the capabilities?
+== How to Use the Capabilities?
 
-To use the capabilities, we simply need to provide them as context parameters in our function signatures.
+Using the capability is just using a context parameter in the signature.
 
 ```scala
-def processFile(path: String)(using IO, CanFail): Unit =
+def processFile(path: String)(using IO): Unit =
   val content = IO.read: lines =>
     lines.mkString("\n")
   IO.write(s"File content:\n$content")
 ```
 
-To execute this code, we need to provide an implementation of the `IO` capability and a way to handle failures:
+Execution becomes “provide the handler, then run the direct-style code”.
 
 ```scala
 def handle[A](program: IO ?=> A): A = ???
 
-@main def run(): Unit = IO.handle:
-  try processFile("data.txt")
-  catch case _: Exception => println("An error occurred")
+@main def run(): Unit =
+  IO.handle:
+    processFile("data.txt")
 ```
 
-== Why Exceptions Still Matter
+#focus-slide[Recall the ```scala signup``` feature]
 
-#feature-block("Why people keep using exceptions")[
-  - Minimal boilerplate on the happy path.
-  - Natural propagation of failures.
-  - Debug-friendly stack traces.
-]
+== Required Capabilities for Sign-Up
+
+After the encoding idea, we can move to a concrete business example.
 
 ```scala
-def readFile(path: String): String =
-  val source = Source.fromFile(path)
-  try source.getLines().mkString("\n")
-  finally source.close()
+type UserState = Map[UUID, User]
+
+trait UserRepository:
+  def get(id: UUID): Option[User]
+  def save(user: User): Unit
+  def changeEmail(id: UUID, newEmail: String): Unit
+
+trait EmailService:
+  def sendEmail(to: String, subject: String, body: String): Unit
 ```
 
-== Checked Exceptions and Either
-
-#warning-block("Java checked exceptions")[
-  In principle they make failures part of the contract, but they compose badly with higher-order APIs.
-
-  ```scala
-  xs.map(x => if x < limit then x * x else throw LimitExceeded())
-  ```
-
-  The callback is not allowed to throw a checked exception.
+#note-block("What the signature already says")[
+  Signing up will need #bold[state], a #bold[repository], and an #bold[email service].
 ]
 
-#pagebreak()
+== Direct-Style Implementation of Sign-Up
 
-#feature-block([```scala Either```])[
-  ```scala
-  def readFile(path: String): Either[IOException, String]
-  ```
+```scala
+def signup(name: Username, email: Email)(using
+  UserRepository,
+  EmailService
+): Unit = ???
+```
 
-  - Restores static typing.
-  - Adds plumbing to the happy path.
-  - Reintroduces the classic problem of composing with other effects.
+#feature-block("Capabilities in the signature")[
+  The required capabilities are *still visible in the signature*, but the implementation can be written in a direct style.
 ]
 
-== Effects as Capabilities
+== End of the World?
 
-#feature-block("The key idea")[
-  Instead of saying “this computation #bold[produces] an effect”, say “this code #bold[requires] the capability to perform that effect”.
+In #bold[monadic style], all the effects are executed at the "end of the world", when we run the program with a concrete handler.
+
+Even in #bold[direct style], the effects are still executed at the end of the world, but the code looks more like ordinary Scala.
+
+```scala
+def myProgram(input: String)(using Effect): Unit =
+  // Do some work with Effect
+
+def handle[A](program: Effect ?=> A): A =
+  given Effect with
+    // Provide the implementation of Effect
+  program
+```
+
+=== End of the World
+
+```scala
+@main def run(): Unit = handle { myProgram("input") }
+```
+
+== Effects as Capabilities for Failure #cite(<Scala3CanThrow>)
+
+#feature-block("The key move")[
+  Instead of saying “this computation produces an error effect”, say “this code requires the capability to throw that error”.
 ]
 
 ```scala
@@ -300,73 +318,64 @@ infix type throws[R, -E <: Exception] = CanThrow[E] ?=> R
 ```
 
 - `CanThrow[E]` is the capability.
-- `R throws E` is just a more readable surface notation.
+- `R throws E` is surface syntax for the same requirement.
 
-== `throws` Is Just Syntax
+== `throws` Is Just Syntax #cite(<Scala3CanThrow>)
 
 ```scala
-def f(x: Double): Double throws LimitExceeded =
-  if x < limit then x * x else throw LimitExceeded()
+sealed abstract class AuthError(msg: String) extends Exception(msg)
+case class InvalidEmail() extends AuthError("invalid email")
+case class EmailAlreadyExists() extends AuthError("email already exists")
 
-def g(x: Double)(using CanThrow[LimitExceeded]): Double =
-  if x < limit then x * x else throw LimitExceeded()
+def validate(email: Email): Unit throws AuthError =
+  if !email.contains("@") then throw InvalidEmail()
+
+def validate2(email: Email)(using CanThrow[AuthError]): Unit =
+  if !email.contains("@") then throw InvalidEmail()
 ```
 
 #note-block("Same meaning")[
-  The two signatures describe the same requirement:
-  the function needs the capability to throw `LimitExceeded`.
+  `throws` is just a readable way to say that the function needs a `CanThrow[AuthError]` capability.
 ]
 
-== LimitExceeded Example
+== Sign-Up with Checked Failure
 
 ```scala
-val limit = 10e9
-class LimitExceeded extends Exception
-
-def unsafeSquare(x: Double): Double =
-  if x < limit then x * x
-  else throw LimitExceeded()
+def signup(name: Username, email: Email)(using
+  UserRepository, EmailService, CanThrow[AuthError]
+): User =
+  validate(email)
+  val user = User(UUID.randomUUID(), name, email)
+  repo.save(user) // may fail with EmailAlreadyExists
+  emailService.sendEmail(...)
+  user
 ```
 
-#warning-block("Compile-time feedback")[
-  This definition is rejected because the body throws `LimitExceeded`,
-  but the signature does not provide a `CanThrow[LimitExceeded]` capability.
-]
-
-== Where Does the Capability Come From?
-
-```scala
-def safeSquare(x: Double): Double throws LimitExceeded =
-  if x < limit then x * x
-  else throw LimitExceeded()
-
-@main def test(xs: Double*) =
-  try println(xs.map(safeSquare).sum)
-  catch case _: LimitExceeded => println("too large")
-```
-
-#feature-block("Scoped capability")[
-  The `try/catch` block is the place where the compiler can introduce the temporary capability required by `safeSquare`.
+#feature-block("What changed?")[
+  The implementation is still direct style.
+  We only added a capability saying that failures are part of the function contract.
 ]
 
 == Higher-Order Caveat
 
 ```scala
-def escaped(xs: Double*): () => Double =
-  try () => xs.map(safeSquare).sum
-  catch case _: LimitExceeded => () => -1.0
+def deferredSignup(name: Username, email: Email)(using
+  CurrentUserState,
+  UserRepository,
+  EmailService
+): () => User =
+  try () => signup(name, email)
+  catch case _: AuthError => () => throw RuntimeException("no retry")
 ```
 
 #warning-block("Problem")[
-  The closure returned by `escaped` can outlive the `try/catch` block.
-  If it still depends on the throwing capability, the effect has #bold[escaped its scope].
+  The returned closure can outlive the `try/catch`.
+  If it still depends on the temporary throwing capability, the effect has #bold[escaped its scope].
 ]
 
-#v(0.4em)
+We need a way to track that some capabilities are #bold[ephemeral].
 
-We need a way to track that these capabilities are #bold[ephemeral].
-
-== Capture Checking
+== Capture Checking #cite(<Scala3CaptureCheckingBasics>) #cite(<Scala3CaptureCheckingHowTo>)
 
 #feature-block("Capture checking in Scala 3")[
   Capture checking tracks which values and closures depend on which capabilities, so that capabilities cannot silently escape the region where they are valid.
@@ -379,7 +388,7 @@ import language.experimental.captureChecking
 - It is the missing ingredient for #bold[sound direct-style effects].
 - It is especially useful for resources, handlers, continuations, and scoped I/O.
 
-== Motivating Example
+== Motivating Example #cite(<Scala3CaptureCheckingBasics>)
 
 ```scala
 def usingLogFile[T](op: FileOutputStream => T): T =
@@ -396,7 +405,7 @@ later(10) // crash
   The returned closure captures `file`, but the file is already closed when the closure runs.
 ]
 
-== Make the File a Capability
+== Make the File a Capability #cite(<Scala3CaptureCheckingBasics>)
 
 ```scala
 def usingLogFile[T](op: FileOutputStream^ => T): T =
@@ -407,31 +416,11 @@ def usingLogFile[T](op: FileOutputStream^ => T): T =
 ```
 
 #feature-block([What ```scala ^``` means])[
-  `FileOutputStream^` is now a #bold[capability value]:
+  `FileOutputStream^` is now a capability value:
   the compiler tracks its lifetime and verifies that results do not carry it outside its valid scope.
 ]
 
-== Why the Closure Is Rejected
-
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("Core intuition")[
-    - `^` marks a value whose authority matters.
-    - The closure type mentions the captured file capability.
-    - The result type of `usingLogFile` cannot mention a local capability that is no longer in scope.
-  ]
-][
-  #warning-block("What the compiler prevents")[
-    ```scala
-    val later =
-      usingLogFile { f => () => f.write(0) }
-    ```
-
-    The returned function would need to carry `f`,
-    but `f` disappears at the end of `usingLogFile`.
-  ]
-]
-
-== Eager vs Lazy Matters
+== Eager vs Lazy Matters #cite(<Scala3CaptureCheckingBasics>)
 
 #components.side-by-side(inset: 0.7em)[
   #feature-block("Safe: eager evaluation")[
@@ -457,23 +446,23 @@ def usingLogFile[T](op: FileOutputStream^ => T): T =
   ]
 ]
 
-== Minimal Notation
+== Minimal Notation #cite(<Scala3CaptureCheckingBasics>)
 
 #components.side-by-side(inset: 0.7em)[
-  #feature-block("Capabilities and function values")[
+  #feature-block("Capabilities and functions")[
     - `T^`: a capability of type `T`.
-    - `A => B`: an impure function that may capture arbitrary capabilities.
+    - `A => B`: a function that may capture capabilities.
     - `A -> B`: a pure function that captures none.
   ]
 ][
   #warning-block("Context functions")[
     - `A ?=> B`: an impure context function.
     - `A ?-> B`: a pure context function.
-    - Capture checking makes these differences #bold[statically meaningful].
+    - Capture checking makes these distinctions statically meaningful.
   ]
 ]
 
-== Direct-Style IO
+== Direct-Style IO Can Also Leak
 
 ```scala
 trait IO:
@@ -481,30 +470,16 @@ trait IO:
   def read[R](combine: IterableOnce[String] => R): R
 
 type EffectIO[R] = IO ?=> R
-```
 
-#feature-block("Reading the signature")[
-  A program of type `EffectIO[R]` needs an `IO` capability in scope and then returns an `R`.
-]
-
-== Unsafe Handler Escape
-
-```scala
 def unsafeReadFile: EffectIO[IterableOnce[String]] =
   IO.read(identity)
-
-def main() =
-  val res = IO.runWithHandler(doubleItAndPrint(5))(using
-    fileHandler(Path.of("input.txt"))
-  )
-  println(res)
 ```
 
-#warning-block("Runtime failure")[
-  If `read` returns a value still tied to the handler, that value can outlive the handler and fail later with errors like `Stream Closed`.
+#warning-block("Handler escape")[
+  If `read` returns a value still tied to the handler, that value can outlive the handler and fail later with errors such as `Stream Closed`.
 ]
 
-== Capture-Aware IO
+== Capture-Aware IO #cite(<Scala3CaptureCheckingBasics>)
 
 ```scala
 trait IO:
@@ -521,37 +496,26 @@ object IO:
   Now the result type can record whether it depends on the surrounding program capability.
 ]
 
-== Why This Helps
-
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("What becomes legal")[
-    - Using the handler inside the callback.
-    - Producing a result that does #bold[not] retain the handler.
-    - Writing direct-style programs over `IO ?=> R`.
-  ]
-][
-  #warning-block("What becomes illegal")[
-    - Returning a value that still captures the file/stream handler.
-    - Smuggling scoped authority into delayed code.
-    - Turning a local capability into a global one.
-  ]
-]
-
 #focus-slide[
   #text(size: 1.3em)[Direct style is pleasant, but #bold[soundness for scoped effects] requires #bold[capture checking].]
 ]
 
-== Separation Checking
+== Separation Checking #cite(<Scala3SeparationChecking>) #cite(<Scala3CaptureCheckingHowTo>)
 
 #feature-block("A different problem")[
   Capture checking controls #bold[lifetime and escape].
   Separation checking controls #bold[aliasing] when mutable capabilities are involved.
 ]
 
+```scala
+import language.experimental.captureChecking
+import language.experimental.separationChecking
+```
+
 - Capture checking asks: “can this capability outlive its scope?”
 - Separation checking asks: “can two references alias the same mutable authority?”
 
-== Mutable Capabilities
+== Mutable Capabilities #cite(<Scala3Mutability>) #cite(<Scala3SeparationChecking>)
 
 ```scala
 trait Mutable extends ExclusiveCapability
@@ -561,13 +525,12 @@ class Matrix(nrows: Int, ncols: Int) extends Mutable:
   def getElem(i: Int, j: Int): Double = ???
 ```
 
-#note-block("Minimal surface")[
-  - `update` marks methods with mutation effects.
-  - `Matrix^` denotes exclusive write authority.
-  - Plain `Matrix` references are treated as read-only in this context.
+#note-block("Back to our auth example")[
+  `CurrentUserState` was intentionally introduced as a mutable capability:
+  separation checking is the mechanism that keeps this sort of write authority from being unsafely aliased.
 ]
 
-== Matrix Multiplication
+== Matrix Multiplication #cite(<Scala3SeparationChecking>)
 
 ```scala
 def multiply(a: Matrix, b: Matrix, c: Matrix^): Unit =
@@ -576,8 +539,8 @@ def multiply(a: Matrix, b: Matrix, c: Matrix^): Unit =
 
 #components.side-by-side(inset: 0.7em)[
   #feature-block("What this tells us")[
-    - `a` and `b` are used read-only.
-    - `c` is the mutable output position.
+    - `a` and `b` are read-only inputs.
+    - `c` is the exclusive mutable output position.
   ]
 ][
   #warning-block("What is guaranteed")[
@@ -589,15 +552,15 @@ def multiply(a: Matrix, b: Matrix, c: Matrix^): Unit =
 == Takeaways
 
 #components.side-by-side(inset: 0.7em)[
-  #feature-block("Three encodings of effects")[
+  #feature-block("Three stages of the story")[
     - Monads encode effects in #bold[values].
     - Direct style encodes effects as #bold[capabilities].
-    - Capture checking makes those capabilities #bold[scoped and safe].
+    - Capture checking makes scoped capabilities #bold[safe].
   ]
 ][
   #warning-block("Why the ending matters")[
-    - Direct style improves readability.
-    - Capture checking prevents capability escape.
-    - Separation checking prevents unsafe aliasing of mutable authority.
+    - The sign-up flow reads like ordinary code.
+    - `CanThrow` keeps failure in the contract.
+    - Separation checking protects mutable authority such as current-user state.
   ]
 ]
