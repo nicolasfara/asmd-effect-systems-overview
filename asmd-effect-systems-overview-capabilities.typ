@@ -368,14 +368,16 @@ def deferredSignup(name: Username, email: Email)(using
   catch case _: AuthError => () => throw RuntimeException("no retry")
 ```
 
+#uncover("2")[
 #warning-block("Problem")[
   The returned closure can outlive the `try/catch`.
   If it still depends on the temporary throwing capability, the effect has #bold[escaped its scope].
 ]
 
 We need a way to track that some capabilities are #bold[ephemeral].
+]
 
-== Capture Checking #cite(<Scala3CaptureCheckingBasics>) #cite(<Scala3CaptureCheckingHowTo>)
+== Capture Checking
 
 #feature-block("Capture checking in Scala 3")[
   Capture checking tracks which values and closures depend on which capabilities, so that capabilities cannot silently escape the region where they are valid.
@@ -385,10 +387,10 @@ We need a way to track that some capabilities are #bold[ephemeral].
 import language.experimental.captureChecking
 ```
 
-- It is the missing ingredient for #bold[sound direct-style effects].
-- It is especially useful for resources, handlers, continuations, and scoped I/O.
+- It is the missing ingredient for #bold[safer direct-style effects].
+- It is especially useful for *resources*, *handlers*, *continuations*, scoped I/O, ...
 
-== Motivating Example #cite(<Scala3CaptureCheckingBasics>)
+== Motivating Example
 
 ```scala
 def usingLogFile[T](op: FileOutputStream => T): T =
@@ -396,7 +398,17 @@ def usingLogFile[T](op: FileOutputStream => T): T =
   val result = op(logFile)
   logFile.close()
   result
+```<tag>
 
+#only("1")[
+  Whats *wrong* with this code?
+]
+
+#only("2")[
+This code will *crash* if higher order functions are used.
+
+// #codly(offset-from: <tag>)
+```scala
 val later = usingLogFile { file => (x: Int) => file.write(x) }
 later(10) // crash
 ```
@@ -404,8 +416,9 @@ later(10) // crash
 #warning-block("Bug")[
   The returned closure captures `file`, but the file is already closed when the closure runs.
 ]
+]
 
-== Make the File a Capability #cite(<Scala3CaptureCheckingBasics>)
+== Make the File a Capability
 
 ```scala
 def usingLogFile[T](op: FileOutputStream^ => T): T =
@@ -420,7 +433,7 @@ def usingLogFile[T](op: FileOutputStream^ => T): T =
   the compiler tracks its lifetime and verifies that results do not carry it outside its valid scope.
 ]
 
-== Eager vs Lazy Matters #cite(<Scala3CaptureCheckingBasics>)
+== Eager vs Lazy Matters
 
 #components.side-by-side(inset: 0.7em)[
   #feature-block("Safe: eager evaluation")[
@@ -430,8 +443,9 @@ def usingLogFile[T](op: FileOutputStream^ => T): T =
         f.write(x)
         x * x
     ```
-
+    #uncover("2")[
     The writes happen immediately, while `f` is still valid.
+    ]
   ]
 ][
   #warning-block("Unsafe: delayed evaluation")[
@@ -441,26 +455,86 @@ def usingLogFile[T](op: FileOutputStream^ => T): T =
         f.write(x)
         x * x
     ```
-
-    The work is delayed, so the file capability may be used too late.
+    #uncover("2")[
+    The work is delayed, so the file capability may be used #underline[too late].
+    ]
   ]
 ]
 
-== Minimal Notation #cite(<Scala3CaptureCheckingBasics>)
+== Capture Set
 
-#components.side-by-side(inset: 0.7em)[
-  #feature-block("Capabilities and functions")[
-    - `T^`: a capability of type `T`.
-    - `A => B`: a function that may capture capabilities.
-    - `A -> B`: a pure function that captures none.
-  ]
-][
-  #warning-block("Context functions")[
-    - `A ?=> B`: an impure context function.
-    - `A ?-> B`: a pure context function.
-    - Capture checking makes these distinctions statically meaningful.
-  ]
+To *track* capabilities, the compiler "annotates" types with a #bold[set of capabilities they capture].
+
+#v(1em)
+
+#align(center)[
+  #set text(size: 1.3em)
+
+  `T^{C₁, C₂, ...}`
 ]
+
+- `T` is a normal type.
+- `C₁, C₂, ...` are the capabilities captured by values of type `T`.
+
+=== Subtyping
+
+- Pure types are subtypes of capturing types. That is, `T <: C T`, for any type `T`, capturing set `C`.
+- For capturing types, smaller capturing sets produce subtypes: `C₁ T₁ <: C₂ T₂` if `C₁ <: C₂` and `T₁ <: T₂`.
+
+=== Instantiation
+
+The type ```scala T``` to be instantiated, requires the capabilities `C₁, C₂, ...` to *be in scope*.
+
+== Loggin Example Explained
+
+```scala
+val res: Int ->{f} Unit = usingLogFile: f =>
+  (x: Int) => f.write(42); x * x
+```
+
+- The type of `res` is `Int ->{f} Unit`, meaning that the returned closure captures the capability `f`.
+
+```scala
+res(10) // error: capability f is not in scope here
+^^^^^^^
+|The expression's type Int => Unit is not allowed to capture the root capability.
+|This usually means that a capability persists longer than its allowed lifetime
+```
+
+- When the type ```scala T``` is instantiated, its capture set #bold[is not empty].
+- The compiler checks that the required capabilities *are in scope*.
+- In this case, `f` *is not in scope* at the call site, so the code is rejected.
+
+// == Minimal Notation
+
+// #components.side-by-side(inset: 0.7em)[
+//   #feature-block("Capabilities and functions")[
+//     - `T^`: a capability of type `T`.
+//     - `A => B`: a function that may capture capabilities.
+//     - `A -> B`: a pure function that captures none.
+//   ]
+// ][
+//   #styled-block(
+//     [#fa-code() #h(0.35em) Context functions],
+//     [
+//       #set par(leading: 0.55em)
+//       #text(size: 0.95em, fill: rgb("#556b74"))[
+//         Clarify function purity with explicit notation.
+//       ]
+
+//       #v(0.55em)
+
+//       - `A ?=> B`: an impure context function.
+//       - `A ?-> B`: a pure context function.
+//       - Capture checking makes these distinctions statically meaningful.
+//     ],
+//     fill-color: rgb("#f9f4f0"),
+//     stroke-color: rgb("#c8a882"),
+//     header-fill-color: rgb("#f0e8e0"),
+//     accent-color: rgb("#c46a11"),
+//     title-color: rgb("#8a5a3a"),
+//   )
+// ]
 
 == Direct-Style IO Can Also Leak
 
@@ -479,7 +553,7 @@ def unsafeReadFile: EffectIO[IterableOnce[String]] =
   If `read` returns a value still tied to the handler, that value can outlive the handler and fail later with errors such as `Stream Closed`.
 ]
 
-== Capture-Aware IO #cite(<Scala3CaptureCheckingBasics>)
+== Capture-Aware IO
 
 ```scala
 trait IO:
@@ -487,13 +561,14 @@ trait IO:
   def read[R](combine: IterableOnce[String]^ => R): R
 
 object IO:
-  def run[R](program: EffectIO[R])(using io: IO): R^{program} =
-    program(using io)
+  def handle[R](program: IO ?=> R): R =
+    given IO with
+      // Provide the implementation of IO
+    program
 ```
 
 #feature-block("Safer encoding")[
-  The callback explicitly receives a capability.
-  Now the result type can record whether it depends on the surrounding program capability.
+  Now the ```scala Iterable``` returned by `read` is a capability, so the compiler can *track its lifetime* and prevent it from being used after the handler is gone.
 ]
 
 #focus-slide[
