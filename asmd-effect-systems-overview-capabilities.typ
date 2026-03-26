@@ -159,18 +159,50 @@ This #bold[reduces the boilerplate] and makes the code look more like ordinary S
 
 == Trade-offs
 
-#components.side-by-side(inset: 0.7em)[
-  === Direct style
-    - Easier local reasoning.
-    - Less boilerplate in the implementation.
-    - Reads like ordinary step-by-step code.
-    - Higher-order safety is more delicate.
+#components.side-by-side(inset: 0.45em, gutter: 1.1em)[
+  #styled-block(
+    [#fa-feather() #h(0.35em) Direct style],
+    [
+      #set par(leading: 0.55em)
+      #text(size: 0.95em, fill: rgb("#556b74"))[
+        Closer to ordinary Scala, with #underline[less ceremony] on the happy path.
+      ]
+
+      #v(0.55em)
+
+      - Easier #bold[local reasoning].
+      - Less implementation #bold[boilerplate].
+      - Reads like step-by-step code.
+      - Higher-order safety is more *delicate*.
+    ],
+    fill-color: rgb("#fff8f1"),
+    stroke-color: rgb("#f1c28a"),
+    header-fill-color: rgb("#fde7cf"),
+    accent-color: rgb("#eb811b"),
+    title-color: rgb("#9a5408"),
+  )
 ][
-  === Monadic style
-    - Composition story is very strong.
-    - Ecosystem and libraries are mature.
-    - More explicit sequencing discipline.
-    - Code can become harder to read when stacks grow.
+  #styled-block(
+    [#fa-cubes() #h(0.35em) Monadic style],
+    [
+      #set par(leading: 0.55em)
+      #text(size: 0.95em, fill: rgb("#556b74"))[
+        #underline[Stronger compositional] structure, with sequencing kept explicit.
+      ]
+
+      #v(0.55em)
+
+      - Very strong #bold[composition story].
+      - #bold[Mature] ecosystem and libraries.
+      - More #bold[explicit sequencing]discipline.
+      - Large stacks can become *harder to read*.
+    ],
+    fill-color: rgb("#f5f9fa"),
+    stroke-color: rgb("#b9cdd3"),
+    header-fill-color: rgb("#e7eff1"),
+    accent-color: rgb("#23373b"),
+    title-color: rgb("#23373b"),
+  )
 ]
 
 #focus-slide[
@@ -187,8 +219,10 @@ trait IO:
   def read[T](f: Iterator[String] => T)(using CanFail): T
 
 object IO:
-  def write(content: String)(using IO, CanFail): Unit = summon[IO].write(content)
-  def read[T](f: Iterator[String] => T)(using IO, CanFail): T = summon[IO].read(f)
+  def write(content: String)(using io: IO, fail: CanFail): Unit =
+    io.write(content)
+  def read[T](f: Iterator[String] => T)(using io: IO, fail: CanFail): T =
+    io.read(f)
 ```
 
 We inverted the control flow: instead of returning an effect type, we require the capability to perform the effect as a context parameter.
