@@ -267,7 +267,7 @@ trait EmailService:
 ```
 
 #note-block("What the signature already says")[
-  Signing up will need #bold[state], a #bold[repository], and an #bold[email service].
+  Signing up will need a #bold[repository], and an #bold[email service].
 ]
 
 == Direct-Style Implementation of Sign-Up
@@ -305,7 +305,7 @@ def handle[A](program: Effect ?=> A): A =
 @main def run(): Unit = handle { myProgram("input") }
 ```
 
-== Effects as Capabilities for Failure #cite(<Scala3CanThrow>)
+== Effects as Capabilities for Failure
 
 #feature-block("The key move")[
   Instead of saying “this computation produces an error effect”, say “this code requires the capability to throw that error”.
@@ -320,12 +320,12 @@ infix type throws[R, -E <: Exception] = CanThrow[E] ?=> R
 - `CanThrow[E]` is the capability.
 - `R throws E` is surface syntax for the same requirement.
 
-== `throws` Is Just Syntax #cite(<Scala3CanThrow>)
+== `throws` Is Just Syntax
 
 ```scala
-sealed abstract class AuthError(msg: String) extends Exception(msg)
-case class InvalidEmail() extends AuthError("invalid email")
-case class EmailAlreadyExists() extends AuthError("email already exists")
+enum AuthError(msg: String) extends Exception(msg):
+  case InvalidEmail extends AuthError("invalid email")
+  case EmailAlreadyExists extends AuthError("email already exists")
 
 def validate(email: Email): Unit throws AuthError =
   if !email.contains("@") then throw InvalidEmail()
@@ -353,16 +353,14 @@ def signup(name: Username, email: Email)(using
 
 #feature-block("What changed?")[
   The implementation is still direct style.
-  We only added a capability saying that failures are part of the function contract.
+  We only *added a capability* saying that failures are part of the function contract.
 ]
 
 == Higher-Order Caveat
 
 ```scala
 def deferredSignup(name: Username, email: Email)(using
-  CurrentUserState,
-  UserRepository,
-  EmailService
+  UserRepository, EmailService
 ): () => User =
   try () => signup(name, email)
   catch case _: AuthError => () => throw RuntimeException("no retry")
@@ -429,8 +427,8 @@ def usingLogFile[T](op: FileOutputStream^ => T): T =
 ```
 
 #feature-block([What ```scala ^``` means])[
-  `FileOutputStream^` is now a capability value:
-  the compiler tracks its lifetime and verifies that results do not carry it outside its valid scope.
+  `FileOutputStream^` is now a *capability* value:
+  the compiler tracks #underline[its lifetime] and verifies that results do not carry it outside its valid scope.
 ]
 
 == Eager vs Lazy Matters
@@ -485,7 +483,53 @@ To *track* capabilities, the compiler "annotates" types with a #bold[set of capa
 
 The type ```scala T``` to be instantiated, requires the capabilities `C₁, C₂, ...` to *be in scope*.
 
-== Loggin Example Explained
+== Function Syntax
+
+#components.side-by-side(inset: 0.7em)[
+  #feature-block("Pure function notation")[
+    ```scala
+    A -> B
+    ```
+
+    - The function captures #bold[nothing].
+    - Think of it as a function with an #bold[empty capture set].
+    - It can be passed around without depending on hidden capabilities.
+  ]
+][
+  #warning-block("Impure function notation")[
+    ```scala
+    A => B
+    ```
+
+    - The function may close over #bold[arbitrary capabilities].
+    - Use it when purity is #bold[not guaranteed].
+    - The precise capture set can be written explicitly, e.g. `A ->{f} B`.
+  ]
+]
+
+#pagebreak()
+
+#styled-block(
+  [#fa-code() #h(0.35em) Context functions follow the same idea],
+  [
+    - `A ?-> B`: pure context function.
+    - `A ?=> B`: context function that may capture arbitrary capabilities.
+  ],
+  fill-color: rgb("#f9f4f0"),
+  stroke-color: rgb("#c8a882"),
+  header-fill-color: rgb("#f0e8e0"),
+  accent-color: rgb("#c46a11"),
+  title-color: rgb("#8a5a3a"),
+)
+
+#feature-block("Pure function with explicit capture set")[
+  ```scala
+  A ->{f} B
+  ```
+  This function #bold[captures the capability] `f`, and *nothing else*.
+]
+
+== Logging Example Explained
 
 ```scala
 val res: Int ->{f} Unit = usingLogFile: f =>
@@ -541,11 +585,11 @@ res(10) // error: capability f is not in scope here
 ```scala
 trait IO:
   def println(content: String): Unit
-  def read[R](combine: IterableOnce[String] => R): R
+  def read[R](combine: Iterator[String] => R): R
 
 type EffectIO[R] = IO ?=> R
 
-def unsafeReadFile: EffectIO[IterableOnce[String]] =
+def unsafeReadFile: EffectIO[Iterator[String]] =
   IO.read(identity)
 ```
 
@@ -558,7 +602,7 @@ def unsafeReadFile: EffectIO[IterableOnce[String]] =
 ```scala
 trait IO:
   def println(content: String): Unit
-  def read[R](combine: IterableOnce[String]^ => R): R
+  def read[R](combine: Iterator[String]^ => R): R
 
 object IO:
   def handle[R](program: IO ?=> R): R =
@@ -568,11 +612,11 @@ object IO:
 ```
 
 #feature-block("Safer encoding")[
-  Now the ```scala Iterable``` returned by `read` is a capability, so the compiler can *track its lifetime* and prevent it from being used after the handler is gone.
+  Now the ```scala Iterator[String]``` returned by `read` is a capability, so the compiler can *track its lifetime* and prevent it from being used after the handler is gone.
 ]
 
 #focus-slide[
-  #text(size: 1.3em)[Direct style is pleasant, but #bold[soundness for scoped effects] requires #bold[capture checking].]
+  #text(size: 1.3em)[Direct style is pleasant, but *preserving scopes* requires #bold[capture checking].]
 ]
 
 == Separation Checking #cite(<Scala3SeparationChecking>) #cite(<Scala3CaptureCheckingHowTo>)
