@@ -619,7 +619,7 @@ object IO:
   #text(size: 1.3em)[Direct style is pleasant, but *preserving scopes* requires #bold[capture checking].]
 ]
 
-== Separation Checking #cite(<Scala3SeparationChecking>) #cite(<Scala3CaptureCheckingHowTo>)
+== Separation Checking
 
 #feature-block("A different problem")[
   Capture checking controls #bold[lifetime and escape].
@@ -634,7 +634,7 @@ import language.experimental.separationChecking
 - Capture checking asks: “can this capability outlive its scope?”
 - Separation checking asks: “can two references alias the same mutable authority?”
 
-== Mutable Capabilities #cite(<Scala3Mutability>) #cite(<Scala3SeparationChecking>)
+== Mutable Capabilities
 
 ```scala
 trait Mutable extends ExclusiveCapability
@@ -649,7 +649,7 @@ class Matrix(nrows: Int, ncols: Int) extends Mutable:
   separation checking is the mechanism that keeps this sort of write authority from being unsafely aliased.
 ]
 
-== Matrix Multiplication #cite(<Scala3SeparationChecking>)
+== Matrix Multiplication
 
 ```scala
 def multiply(a: Matrix, b: Matrix, c: Matrix^): Unit =
